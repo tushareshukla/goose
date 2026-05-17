@@ -2,12 +2,19 @@ import { useTranslation } from "react-i18next";
 import { motion, useReducedMotion } from "motion/react";
 import { Shimmer } from "@/shared/ui/ai-elements/shimmer";
 
+// ── RUSKY FORK PATCH ──
+// Extended LoadingChatState — 5 upstream states + 3 Rusky additions.
+// The 3 additions map to HuskyState variants from SPEC-030.
 export type LoadingChatState =
-  | "idle"
-  | "thinking"
-  | "streaming"
-  | "waiting"
-  | "compacting";
+  | "idle" // upstream — Husky: idle
+  | "thinking" // upstream — Husky: thinking
+  | "streaming" // upstream — Husky: responding
+  | "waiting" // upstream — Husky: responding (same visual)
+  | "compacting" // upstream — Husky: thinking (compaction = cognitive work)
+  | "listening" // RUSKY-ADDED — Husky: listening (microphone active)
+  | "success" // RUSKY-ADDED — Husky: success (action completed)
+  | "sleeping"; // RUSKY-ADDED — Husky: sleeping (idle > auto-sleep threshold)
+// ── /RUSKY FORK PATCH ──
 
 interface LoadingGooseProps {
   chatState?: LoadingChatState;
@@ -19,15 +26,21 @@ const LOADING_SHIMMER_SPREAD = 3;
 const LOADING_SHIMMER_DELAY_S = 0.35;
 const LOADING_SHIMMER_REPEAT_DELAY_S = 0.9;
 
+// ── RUSKY FORK PATCH ──
+// Extended message key map — covers all 8 members of LoadingChatState.
 const MESSAGE_KEY_BY_STATE: Record<
   Exclude<LoadingChatState, "idle">,
-  "thinking" | "responding" | "compacting"
+  "thinking" | "responding" | "compacting" | "listening" | "success" | "sleeping"
 > = {
   thinking: "thinking",
   streaming: "responding",
   waiting: "responding",
   compacting: "compacting",
+  listening: "listening", // RUSKY-ADDED
+  success: "success", // RUSKY-ADDED
+  sleeping: "sleeping", // RUSKY-ADDED
 };
+// ── /RUSKY FORK PATCH ──
 
 export function LoadingGoose({ chatState = "idle" }: LoadingGooseProps) {
   const { t } = useTranslation("chat");

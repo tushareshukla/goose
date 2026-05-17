@@ -113,7 +113,10 @@
   "loading": {
     "compacting": "Compactando conversación...",
     "thinking": "Pensando...",
-    "responding": "Respondiendo..."
+    "responding": "Respondiendo...",
+    "listening": "Rusky está escuchando…",
+    "success": "Rusky entregó.",
+    "sleeping": "Zzz…"
   },
   "mention": {
     "ariaLabel": "Sugerencias de menciones",
