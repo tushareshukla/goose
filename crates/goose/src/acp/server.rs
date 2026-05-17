@@ -80,6 +80,11 @@ mod resources;
 mod sessions;
 mod sources;
 mod tools;
+// ── RUSKY FORK PATCH ──
+mod rusky_distro;
+#[cfg(feature = "rusky-memory")]
+mod rusky_memory;
+// ── /RUSKY FORK PATCH ──
 
 pub type AcpProviderFactory = Arc<
     dyn Fn(

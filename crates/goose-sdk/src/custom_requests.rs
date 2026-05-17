@@ -1283,3 +1283,192 @@ pub struct DictationModelSelectRequest {
     pub provider: String,
     pub model_id: String,
 }
+
+// ── RUSKY FORK PATCH: _rusky/distro/info ─────────────────────────────────────
+
+/// Returns the loaded distro manifest. Called once at app boot by the
+/// React app to populate the distro Zustand store. Session-independent.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/distro/info", response = DistroInfoResponse)]
+pub struct DistroInfoRequest {}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct DistroInfoResponse {
+    /// All feature toggles from SPEC-012 §5.
+    pub feature_toggles: HashMap<String, bool>,
+    /// Ordered list of allowed MCP ids from SPEC-012 §5.
+    pub extension_allowlist: Vec<String>,
+    /// SemVer matching Tauri package.version (CI-gated per SPEC-012 AC-10).
+    pub app_version: String,
+    /// ISO-8601 timestamp when the distro.json was last read (process start time).
+    pub locked_at: String,
+}
+
+/// A single feature toggle entry (expanded representation for SDK consumers).
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FeatureToggle {
+    pub key: String,
+    pub enabled: bool,
+}
+
+/// A single entry in the extension allowlist.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtensionAllowlistEntry {
+    /// MCP extension id, e.g. "developer", "browser", "github".
+    pub id: String,
+}
+
+// ── /RUSKY FORK PATCH: _rusky/distro/info ────────────────────────────────────
+
+// ── RUSKY FORK PATCH: _rusky/memory/* ────────────────────────────────────────
+
+#[cfg(feature = "rusky-memory")]
+pub mod rusky_memory_types {
+    use super::*;
+
+    // ── _rusky/memory/flush ──────────────────────────────────────────────────
+
+    /// Flush in-flight session turns to today's daily log.
+    /// Idempotent. Safe to call at any point.
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(method = "_rusky/memory/flush", response = MemoryFlushResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct MemoryFlushRequest {
+        /// Optional session id to flush. None means flush all open sessions.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub session_id: Option<String>,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct MemoryFlushResponse {
+        /// Number of turns flushed to disk.
+        pub turns_flushed: u32,
+        /// Path to the daily log file (for diagnostic use; not shown in UI).
+        pub log_path: Option<String>,
+    }
+
+    // ── _rusky/memory/compile ────────────────────────────────────────────────
+
+    /// Compile daily logs into the persistent memory store (SPEC-040).
+    /// Long-running. May be called by the Tauri end-of-day timer.
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(method = "_rusky/memory/compile", response = MemoryCompileResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct MemoryCompileRequest {
+        /// ISO-8601 date to compile (e.g. "2026-05-17"). Defaults to today.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub date: Option<String>,
+        /// If true, re-compile even if a compiled entry already exists for the date.
+        #[serde(default)]
+        pub force: bool,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct MemoryCompileResponse {
+        /// Number of memory entries written to the store.
+        pub entries_written: u32,
+        /// ISO-8601 date compiled.
+        pub date: String,
+        /// Whether compilation was skipped (date already compiled, force = false).
+        pub skipped: bool,
+    }
+
+    // ── _rusky/memory/search ─────────────────────────────────────────────────
+
+    /// Semantic search over the compiled memory store.
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(method = "_rusky/memory/search", response = MemorySearchResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct MemorySearchRequest {
+        /// Natural-language query string.
+        pub query: String,
+        /// Maximum hits to return. Default 10. Max 50.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub limit: Option<u32>,
+        /// Optional ISO-8601 date range start (inclusive).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub since: Option<String>,
+        /// Optional ISO-8601 date range end (inclusive).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub until: Option<String>,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct MemorySearchResponse {
+        pub hits: Vec<MemoryHit>,
+        /// Total entries searched (for pagination diagnostics).
+        pub total_searched: u32,
+    }
+
+    /// A single memory search result.
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub struct MemoryHit {
+        /// Stable identifier for this memory entry (used in forget requests).
+        pub id: String,
+        /// Relevance score 0.0–1.0 (higher is more relevant).
+        pub score: f32,
+        /// ISO-8601 date this entry was compiled from.
+        pub date: String,
+        /// Short summary of the memory entry (safe to display in UI).
+        pub summary: String,
+        /// Full content of the entry (returned only when explicitly requested).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub content: Option<String>,
+    }
+
+    // ── _rusky/memory/forget ─────────────────────────────────────────────────
+
+    /// Delete a specific memory entry from the store.
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(method = "_rusky/memory/forget", response = MemoryForgetResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct MemoryForgetRequest {
+        /// The `id` field from a `MemoryHit`.
+        pub id: String,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct MemoryForgetResponse {
+        /// True if the entry was found and deleted; false if not found (idempotent).
+        pub deleted: bool,
+    }
+
+    // ── _rusky/memory/status ─────────────────────────────────────────────────
+
+    /// Report the health and statistics of the memory subsystem.
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(method = "_rusky/memory/status", response = MemoryStatusResponse)]
+    pub struct MemoryStatusRequest {}
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct MemoryStatusResponse {
+        /// "ok" | "not_implemented" | "degraded" | "unavailable"
+        pub status: String,
+        /// Human-readable status message.
+        pub message: String,
+        /// SPEC reference — present when status is "not_implemented".
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub spec: Option<String>,
+        /// Total entries in the compiled store.
+        pub total_entries: u32,
+        /// ISO-8601 date of the most recent compiled day.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub last_compiled_date: Option<String>,
+        /// Bytes consumed by the memory store on disk.
+        pub store_size_bytes: u64,
+    }
+}
+
+#[cfg(feature = "rusky-memory")]
+pub use rusky_memory_types::*;
+
+// ── /RUSKY FORK PATCH: _rusky/memory/* ───────────────────────────────────────

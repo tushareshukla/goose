@@ -37,6 +37,11 @@ native-tls = [
     "goose/native-tls",
     "goose-mcp/native-tls",
 ]
+# ── RUSKY FORK PATCH ──
+# Activate the _rusky/memory/* ACP method family in Rusky builds.
+# Non-Rusky goose-server builds leave this off and pay zero binary-size cost.
+rusky-memory = ["goose/rusky-memory"]
+# ── /RUSKY FORK PATCH ──
 
 [dependencies]
 goose = { path = "../goose", default-features = false }

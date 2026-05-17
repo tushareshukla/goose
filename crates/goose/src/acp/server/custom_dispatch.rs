@@ -8,6 +8,17 @@ impl GooseAcpAgent {
         method: &str,
         params: serde_json::Value,
     ) -> Result<serde_json::Value, agent_client_protocol::Error> {
+        // ── RUSKY FORK PATCH ──
+        #[cfg(feature = "rusky-memory")]
+        {
+            if let Some(result) = self
+                .dispatch_rusky_memory_request(method, params.clone())
+                .await
+            {
+                return result;
+            }
+        }
+        // ── /RUSKY FORK PATCH ──
         self.handle_custom_request(method, params).await
     }
 
@@ -449,4 +460,16 @@ impl GooseAcpAgent {
     ) -> Result<EmptyResponse, agent_client_protocol::Error> {
         self.on_dictation_model_select(req).await
     }
+
+    // ── RUSKY FORK PATCH ──
+
+    #[custom_method(DistroInfoRequest)]
+    async fn dispatch_rusky_distro_info(
+        &self,
+        req: DistroInfoRequest,
+    ) -> Result<DistroInfoResponse, agent_client_protocol::Error> {
+        self.on_distro_info(req).await
+    }
+
+    // ── /RUSKY FORK PATCH ──
 }

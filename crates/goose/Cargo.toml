@@ -38,6 +38,11 @@ aws-providers = [
 ]
 cuda = ["local-inference", "candle-core/cuda", "candle-nn/cuda", "llama-cpp-2/cuda"]
 vulkan = ["local-inference", "llama-cpp-2/vulkan"]
+# ── RUSKY FORK PATCH ──
+# Gates _rusky/memory/* ACP method dispatch. Propagates the feature flag from
+# goose-sdk so that goose-server can activate it via goose's feature dependency.
+rusky-memory = ["goose-sdk/rusky-memory"]
+# ── /RUSKY FORK PATCH ──
 rustls-tls = [
     "dep:rustls",
     "reqwest/rustls",

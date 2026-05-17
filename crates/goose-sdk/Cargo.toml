@@ -19,6 +19,13 @@ schemars = { workspace = true, features = ["derive"] }
 tokio = { workspace = true }
 tokio-util = { workspace = true, features = ["compat", "rt"] }
 
+[features]
+# ── RUSKY FORK PATCH ──
+# Gates the _rusky/memory/* ACP method family types. Enable in Rusky builds;
+# non-Rusky goose builds pay zero binary-size cost without this feature.
+rusky-memory = []
+# ── /RUSKY FORK PATCH ──
+
 [package.metadata.cargo-machete]
 # Used to provide extras imports for agent-client-protocol
 ignored = ["agent-client-protocol-schema"]
