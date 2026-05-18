@@ -388,21 +388,34 @@ fn parse_plan_command(input: String) -> Option<InputResult> {
 }
 
 fn get_input_prompt_string() -> String {
-    if is_vte_with_broken_emoji_width() {
-        return "> ".to_string();
+    if supports_emoji_prompt() {
+        "🪿 ".to_string()
+    } else {
+        "> ".to_string()
     }
-    "🪿 ".to_string()
 }
 
-/// VTE < 0.70 renders 🪿 as 1 cell while unicode-width counts 2, causing cursor offset.
-fn is_vte_with_broken_emoji_width() -> bool {
-    let Ok(vte_version) = std::env::var("VTE_VERSION") else {
+fn supports_emoji_prompt() -> bool {
+    if std::env::var("GOOSE_CLI_PLAIN_PROMPT").is_ok() {
         return false;
-    };
-    let Ok(version) = vte_version.parse::<u32>() else {
-        return true;
-    };
-    version < 7000
+    }
+
+    if let Ok(vte_version) = std::env::var("VTE_VERSION") {
+        if vte_version.parse::<u32>().unwrap_or(0) >= 7000 {
+            return true;
+        }
+    }
+
+    if let Ok(term) = std::env::var("TERM_PROGRAM") {
+        if matches!(
+            term.as_str(),
+            "iTerm.app" | "WezTerm" | "ghostty" | "vscode"
+        ) {
+            return true;
+        }
+    }
+
+    std::env::var("KITTY_PID").is_ok() || std::env::var("WT_SESSION").is_ok()
 }
 
 fn print_help() {
