@@ -1472,3 +1472,333 @@ pub mod rusky_memory_types {
 pub use rusky_memory_types::*;
 
 // ── /RUSKY FORK PATCH: _rusky/memory/* ───────────────────────────────────────
+
+// ── RUSKY FORK PATCH: _rusky/heartbeat/inject ─────────────────────────────────
+//
+// SPEC-090 — Heartbeat driver + ACP injection.
+//
+// The Tauri shell owns the cadence (default 10-minute interval, see
+// SPEC-090 AC-1). On each tick — past all pause conditions — it calls
+// this method to inject the hardcoded `HEARTBEAT_PROMPT` as a
+// `role: "system"` message into the named session, which triggers
+// exactly one inference turn (AC-3, AC-4).
+
+/// Inject a heartbeat prompt into the named session and trigger a single
+/// inference turn. The body is the fixed `HEARTBEAT_PROMPT` (see SPEC-090
+/// §Architecture); the handler does not synthesize the prompt itself.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/heartbeat/inject", response = HeartbeatInjectResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct HeartbeatInjectRequest {
+    /// The main Rusky chat session id to inject into.
+    pub session_id: String,
+    /// Always `"system"` in v1; reserved for future expansion.
+    #[serde(default = "default_role")]
+    pub role: String,
+    /// The hardcoded heartbeat prompt body (the driver supplies it).
+    pub content: String,
+}
+
+fn default_role() -> String {
+    "system".to_string()
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct HeartbeatInjectResponse {
+    /// True if the injection was accepted by the agent loop.
+    pub ok: bool,
+    /// Identifier the agent assigned to the injected system message
+    /// (used by tests and the chat-store to tag origin = "heartbeat").
+    pub message_id: String,
+    /// True when the injection actually triggered an inference turn.
+    /// False (with `ok = true`) when the agent loop was busy with a
+    /// user-driven turn (heartbeat_inject_busy — treated as a skip).
+    pub inference_started: bool,
+}
+
+// ── /RUSKY FORK PATCH: _rusky/heartbeat/inject ────────────────────────────────
+
+// ── RUSKY FORK PATCH: _rusky/automations/* (SPEC-061) ────────────────────────
+
+#[cfg(feature = "rusky-automations")]
+pub mod rusky_automations_types {
+    use super::*;
+
+    /// Goose recipe parameter (mirrors the upstream recipe schema, camelCased
+    /// for the wire). Only the subset surfaced via ACP.
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationRecipeParameter {
+        pub name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub description: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "type")]
+        pub type_: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub default: Option<serde_json::Value>,
+    }
+
+    /// One recipe in `_rusky/automations/list`. Mirrors the FE
+    /// `Recipe` shape (rusky-app/.../features/automations/types.ts).
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationRecipe {
+        pub recipe_id: String,
+        pub version: u32,
+        pub title: String,
+        pub description: String,
+        pub instructions: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub prompt: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub parameters: Option<Vec<AutomationRecipeParameter>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub extensions: Option<Vec<String>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub sub_recipes: Option<Vec<String>>,
+        /// One of "bundled" | "nl_creator" | "agent_proposed" | "user_authored".
+        pub source: String,
+    }
+
+    /// One (recipe, cron) schedule in `_rusky/automations/list`.
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationSchedule {
+        pub recipe_id: String,
+        pub cron: String,
+        pub enabled: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub last_fired_at: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub next_fire_at: Option<String>,
+    }
+
+    /// One row in `_rusky/automations/history_list`.
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationRun {
+        pub run_id: String,
+        pub recipe_id: String,
+        pub started_at: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub ended_at: Option<String>,
+        /// "ok" | "failed" | "cancelled" | "skipped_locked" | "skipped_autopilot_off"
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub outcome: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub failure_kind: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub current_step: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub summary: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub chat_session: Option<String>,
+    }
+
+    // ── _rusky/automations/list ───────────────────────────────────────────────
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(method = "_rusky/automations/list", response = AutomationsListResponse)]
+    pub struct AutomationsListRequest {}
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsListResponse {
+        pub recipes: Vec<AutomationRecipe>,
+        pub schedules: Vec<AutomationSchedule>,
+    }
+
+    // ── _rusky/automations/run_now ────────────────────────────────────────────
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(method = "_rusky/automations/run_now", response = AutomationsRunNowResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsRunNowRequest {
+        pub recipe_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub params: Option<HashMap<String, serde_json::Value>>,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsRunNowResponse {
+        pub run_id: String,
+    }
+
+    // ── _rusky/automations/stop ───────────────────────────────────────────────
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(method = "_rusky/automations/stop", response = AutomationsStopResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsStopRequest {
+        pub run_id: String,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsStopResponse {
+        pub ok: bool,
+    }
+
+    // ── _rusky/automations/schedule_register ──────────────────────────────────
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(
+        method = "_rusky/automations/schedule_register",
+        response = AutomationsScheduleRegisterResponse
+    )]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsScheduleRegisterRequest {
+        pub recipe_id: String,
+        /// Standard 5-field cron expression.
+        pub cron: String,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsScheduleRegisterResponse {
+        pub ok: bool,
+    }
+
+    // ── _rusky/automations/schedule_unregister ────────────────────────────────
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(
+        method = "_rusky/automations/schedule_unregister",
+        response = AutomationsScheduleUnregisterResponse
+    )]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsScheduleUnregisterRequest {
+        pub recipe_id: String,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsScheduleUnregisterResponse {
+        pub ok: bool,
+    }
+
+    // ── _rusky/automations/propose ────────────────────────────────────────────
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(method = "_rusky/automations/propose", response = AutomationsProposeResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsProposeRequest {
+        pub yaml: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub cron: Option<String>,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsProposeResponse {
+        pub recipe_id: String,
+    }
+
+    // ── _rusky/automations/nl_to_recipe ───────────────────────────────────────
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(
+        method = "_rusky/automations/nl_to_recipe",
+        response = AutomationsNlToRecipeResponse
+    )]
+    pub struct AutomationsNlToRecipeRequest {
+        /// User's natural-language description (NEVER logged — SPEC-061 §Telemetry).
+        pub description: String,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsNlToRecipeResponse {
+        pub yaml: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub cron: Option<String>,
+    }
+
+    // ── _rusky/automations/validate ───────────────────────────────────────────
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(method = "_rusky/automations/validate", response = AutomationsValidateResponse)]
+    pub struct AutomationsValidateRequest {
+        pub yaml: String,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsValidateResponse {
+        pub ok: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub errors: Option<Vec<String>>,
+    }
+
+    // ── _rusky/automations/history_list ───────────────────────────────────────
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+    #[request(
+        method = "_rusky/automations/history_list",
+        response = AutomationsHistoryListResponse
+    )]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsHistoryListRequest {
+        /// Max rows to return. Default 100, capped at 200.
+        #[serde(default)]
+        pub limit: u32,
+        /// Pagination offset.
+        #[serde(default)]
+        pub offset: u32,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AutomationsHistoryListResponse {
+        pub runs: Vec<AutomationRun>,
+    }
+}
+
+#[cfg(feature = "rusky-automations")]
+pub use rusky_automations_types::*;
+
+// ── /RUSKY FORK PATCH: _rusky/automations/* ──────────────────────────────────
+
+// ── RUSKY FORK PATCH: _rusky/browser/ensure (SPEC-080) ───────────────────────
+//
+// SPEC-080 — Bundled Chromium browser pane. The `_rusky/browser/ensure`
+// ACP method is the agent-side trigger for the lazy-boot lifecycle
+// implemented in `rusky-app/src-tauri/src/browser_pane/`. The desktop
+// shell owns the actual `tokio::process::Child` and the CDP readiness
+// probe; goose forwards the call through to the Tauri command
+// `browser_pane_ensure` using the local-agent token.
+//
+// Full implementation (handler that bridges ACP → Tauri command) is
+// deferred to SPEC-051 §Fork patches. This block declares the
+// schema-bearing request/response structs so generated SDKs are aware
+// of the surface ahead of that work.
+
+/// Trigger the lazy-boot of the bundled Chromium sidecar. Idempotent —
+/// when Chromium is already running the call returns immediately with
+/// the cached PID (SPEC-080 AC-3).
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/ensure", response = BrowserEnsureResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserEnsureRequest {}
+
+/// Status snapshot returned by `_rusky/browser/ensure`. Mirrors the
+/// `BrowserPaneStatus` struct in `rusky-app/src-tauri/src/browser_pane/`.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserEnsureResponse {
+    /// PID of the running Chromium child once spawn + readiness probe
+    /// succeed. `None` while the probe is still in flight.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u32>,
+    /// `http://127.0.0.1:39222` in v1.
+    pub cdp_endpoint: String,
+    /// True once the CDP `/json/version` probe returned 200 OK.
+    pub ready: bool,
+    /// SPEC-080 AC-7 — capped at 1 across the lifecycle.
+    #[serde(default)]
+    pub respawn_count: u8,
+}
+
+// ── /RUSKY FORK PATCH: _rusky/browser/ensure ─────────────────────────────────

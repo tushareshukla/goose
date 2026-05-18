@@ -18,6 +18,33 @@ impl GooseAcpAgent {
                 return result;
             }
         }
+        // SPEC-061 — _rusky/automations/* handlers (recipes + schedules + runs).
+        #[cfg(feature = "rusky-automations")]
+        {
+            if let Some(result) = self
+                .dispatch_rusky_automations_request(method, params.clone())
+                .await
+            {
+                return result;
+            }
+        }
+        // SPEC-090 — Heartbeat driver + ACP injection. The handler is
+        // always compiled; gating happens client-side in the driver.
+        if let Some(result) = self
+            .dispatch_rusky_heartbeat_request(method, params.clone())
+            .await
+        {
+            return result;
+        }
+        // SPEC-070 — AI Team coordinator handlers (always-on, no feature
+        // gate). FE adapter in rusky-app degrades gracefully on absence
+        // but the wedge here is small and dependency-free.
+        if let Some(result) = self
+            .dispatch_rusky_coordinator_request(method, params.clone())
+            .await
+        {
+            return result;
+        }
         // ── /RUSKY FORK PATCH ──
         self.handle_custom_request(method, params).await
     }

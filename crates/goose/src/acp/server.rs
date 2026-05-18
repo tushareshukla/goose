@@ -82,11 +82,21 @@ mod sources;
 mod tools;
 // ── RUSKY FORK PATCH ──
 mod rusky_distro;
+// SPEC-090 — Heartbeat driver + ACP injection. Always compiled (no
+// feature gate); the Tauri-shell driver decides whether to fire ticks.
+mod rusky_heartbeat;
 #[cfg(feature = "rusky-memory")]
 mod rusky_memory;
+// SPEC-061: _rusky/automations/* handlers (recipes + schedules + runs).
+#[cfg(feature = "rusky-automations")]
+mod rusky_automations;
 // SPEC-051 AC-3: ACP SessionEnd event. Always compiled (no feature gate)
 // because session-lifecycle observability is independent of memory.
 pub mod rusky_session_end;
+// SPEC-070: AI Team coordinator ACP handlers. Always compiled (no feature
+// gate) — the FE adapter in rusky-app degrades gracefully when handlers
+// are absent, but the wedge here is small and dependency-free.
+pub mod rusky_coordinator;
 // ── /RUSKY FORK PATCH ──
 
 pub type AcpProviderFactory = Arc<
