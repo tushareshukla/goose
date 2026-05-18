@@ -70,6 +70,39 @@ pub async fn compact_messages(
 ) -> Result<(Conversation, ProviderUsage)> {
     info!("Performing message compaction");
 
+    // ── RUSKY FORK PATCH: PreCompact sync hook ───────────────────────────────
+    // Fire the `PreCompact` sync hook BEFORE the compactor reduces history.
+    // Rusky's memory-flush hook reads this signal to flush pending turns to
+    // the daily log so facts captured between flushes survive compaction.
+    // See SPEC-040 §Flush and SPEC-051 AC-2.
+    //
+    // Default behavior (no Rusky hooks registered): single `is_empty_hint()`
+    // check, zero observable cost. Backwards-compatible with vanilla goose.
+    {
+        let ctx = crate::hooks::sync::SyncHookContext {
+            session_id: session_id.to_string(),
+            messages_summary: None,
+            system_prompt: None,
+        };
+        let result = crate::hooks::sync::dispatch_precompact(&ctx).await;
+        if let Some(reason) = result.aborted {
+            tracing::warn!(
+                target: "goose::hooks::sync",
+                event = "precompact_hook_fired",
+                reason = %reason,
+                "PreCompact hook aborted; surfacing as compaction error",
+            );
+            anyhow::bail!("PreCompact hook aborted: {reason}");
+        }
+        tracing::debug!(
+            target: "goose::hooks::sync",
+            event = "precompact_hook_fired",
+            session_id = %session_id,
+            "PreCompact dispatch complete",
+        );
+    }
+    // ── /RUSKY FORK PATCH ───────────────────────────────────────────────────
+
     let messages = conversation.messages();
 
     let has_text_only = |msg: &Message| {

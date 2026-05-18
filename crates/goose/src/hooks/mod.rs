@@ -1,6 +1,18 @@
 //! Lifecycle hooks support, modelled after the Open Plugins
 //! [hooks specification](https://open-plugins.com/agent-builders/components/hooks).
 //!
+//! # Two hook flavors
+//!
+//! - **Observer hooks** (this module's `HookManager`): fire-and-forget,
+//!   shell-command based, can't influence the in-flight operation.
+//! - **Synchronous hooks** ([`sync`] submodule, Rusky fork): awaited by the
+//!   agent loop at well-defined insertion points (`PreLLMRequest`,
+//!   `PreCompact`); may mutate the in-flight request or signal abort.
+//!
+//! See [`sync::SyncHookManager`] for the Rusky memory subsystem's hook
+//! integration. The two managers are orthogonal — observer hooks continue
+//! to work unchanged whether sync hooks are registered or not.
+//!
 //! Hooks live in `<plugin-root>/hooks/hooks.json` of any plugin discovered by
 //! [`crate::plugins::discovery::discover_enabled_plugins`]. The schema is:
 //!
@@ -22,6 +34,9 @@
 //! Goose currently supports `type: "command"` actions. Unknown event names and
 //! action types are ignored per the spec. Hook scripts receive the JSON event
 //! context on stdin and SHOULD exit 0 on success.
+
+// Rusky fork: synchronous hooks (PreLLMRequest / PreCompact). See SPEC-051.
+pub mod sync;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

@@ -84,6 +84,9 @@ mod tools;
 mod rusky_distro;
 #[cfg(feature = "rusky-memory")]
 mod rusky_memory;
+// SPEC-051 AC-3: ACP SessionEnd event. Always compiled (no feature gate)
+// because session-lifecycle observability is independent of memory.
+pub mod rusky_session_end;
 // ── /RUSKY FORK PATCH ──
 
 pub type AcpProviderFactory = Arc<

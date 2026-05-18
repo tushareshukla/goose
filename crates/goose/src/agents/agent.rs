@@ -1547,10 +1547,69 @@ impl Agent {
                     &working_dir,
                 ).await;
 
+                // ── RUSKY FORK PATCH: PreLLMRequest sync hook ───────────────
+                // Dispatch the `PreLLMRequest` chain right before the LLM call.
+                // Rusky's memory-recall hook runs here to inject top-k memories
+                // as a prepended/appended system message. See SPEC-040 §Recall
+                // and SPEC-051 AC-1.
+                //
+                // Mutations are applied to a per-turn copy of `system_prompt`
+                // so the next turn starts from the original. Abort yields a
+                // user-visible message and breaks the loop.
+                let effective_system_prompt: String = {
+                    let ctx = crate::hooks::sync::SyncHookContext {
+                        session_id: session_config.id.clone(),
+                        messages_summary: Some(format!(
+                            "{} messages",
+                            conversation_with_moim.messages().len()
+                        )),
+                        system_prompt: Some(system_prompt.clone()),
+                    };
+                    let chain = crate::hooks::sync::dispatch_prellm_request(&ctx).await;
+                    if let Some(reason) = chain.aborted {
+                        yield AgentEvent::Message(
+                            Message::assistant().with_text(format!(
+                                "Memory hook stopped this turn: {reason}"
+                            )),
+                        );
+                        break;
+                    }
+                    if chain.mutations.is_empty() {
+                        system_prompt.clone()
+                    } else {
+                        let mut prepended = String::new();
+                        let mut appended = String::new();
+                        for m in chain.mutations {
+                            match m {
+                                crate::hooks::sync::SyncHookMutation::PrependSystemMessage(s) => {
+                                    if !prepended.is_empty() { prepended.push_str("\n\n"); }
+                                    prepended.push_str(&s);
+                                }
+                                crate::hooks::sync::SyncHookMutation::AppendSystemMessage(s) => {
+                                    if !appended.is_empty() { appended.push_str("\n\n"); }
+                                    appended.push_str(&s);
+                                }
+                            }
+                        }
+                        let mut combined = String::new();
+                        if !prepended.is_empty() {
+                            combined.push_str(&prepended);
+                            combined.push_str("\n\n");
+                        }
+                        combined.push_str(&system_prompt);
+                        if !appended.is_empty() {
+                            combined.push_str("\n\n");
+                            combined.push_str(&appended);
+                        }
+                        combined
+                    }
+                };
+                // ── /RUSKY FORK PATCH ─────────────────────────────────────────
+
                 let mut stream = Self::stream_response_from_provider(
                     self.provider().await?,
                     &session_config.id,
-                    &system_prompt,
+                    &effective_system_prompt,
                     conversation_with_moim.messages(),
                     &tools,
                     &toolshim_tools,

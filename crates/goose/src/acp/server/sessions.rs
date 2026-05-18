@@ -42,6 +42,15 @@ impl GooseAcpAgent {
         &self,
         req: DeleteSessionRequest,
     ) -> Result<EmptyResponse, agent_client_protocol::Error> {
+        // ── RUSKY FORK PATCH: SPEC-051 AC-3 ──
+        // Explicit user-initiated session close. Emit before deletion so
+        // a subscriber reading `session_id` from the event can still
+        // resolve the session in any side-store at emission time.
+        super::rusky_session_end::emit_session_end(
+            &req.session_id,
+            super::rusky_session_end::SessionEndReason::UserClose,
+        );
+        // ── /RUSKY FORK PATCH ──
         self.session_manager
             .delete_session(&req.session_id)
             .await
@@ -112,6 +121,14 @@ impl GooseAcpAgent {
         &self,
         req: ArchiveSessionRequest,
     ) -> Result<EmptyResponse, agent_client_protocol::Error> {
+        // ── RUSKY FORK PATCH: SPEC-051 AC-3 ──
+        // Archive removes the session from the active map; treat as a
+        // user-close from a SessionEnd perspective.
+        super::rusky_session_end::emit_session_end(
+            &req.session_id,
+            super::rusky_session_end::SessionEndReason::UserClose,
+        );
+        // ── /RUSKY FORK PATCH ──
         self.session_manager
             .update(&req.session_id)
             .archived_at(Some(chrono::Utc::now()))
