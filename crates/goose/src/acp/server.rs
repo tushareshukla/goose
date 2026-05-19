@@ -106,6 +106,9 @@ pub mod rusky_storage;
 // chat infinite-scroll-up loader in rusky-app. Always compiled — read-only
 // over the existing session store, no external dependencies.
 pub mod rusky_chat;
+// _rusky/network/test_connection — Settings → Network test-connection probe.
+// Always compiled; reads `RUSKY_NETWORK_PROXY_URL` config + env fallback.
+pub mod rusky_network;
 // ── /RUSKY FORK PATCH ──
 
 pub type AcpProviderFactory = Arc<

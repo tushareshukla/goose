@@ -540,5 +540,14 @@ impl GooseAcpAgent {
         self.on_sessions_import(req).await
     }
 
+    // _rusky/network/test_connection — Settings → Network proxy probe.
+    #[custom_method(NetworkTestConnectionRequest)]
+    async fn dispatch_rusky_network_test_connection(
+        &self,
+        req: NetworkTestConnectionRequest,
+    ) -> Result<NetworkTestConnectionResponse, agent_client_protocol::Error> {
+        self.on_network_test_connection(req).await
+    }
+
     // ── /RUSKY FORK PATCH ──
 }
