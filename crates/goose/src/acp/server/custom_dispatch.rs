@@ -549,5 +549,15 @@ impl GooseAcpAgent {
         self.on_network_test_connection(req).await
     }
 
+    // _rusky/projects/create — lightweight project-folder creation for
+    // the sidebar "+ New Project" CTA. See `rusky_projects.rs`.
+    #[custom_method(CreateProjectRequest)]
+    async fn dispatch_rusky_project_create(
+        &self,
+        req: CreateProjectRequest,
+    ) -> Result<CreateProjectResponse, agent_client_protocol::Error> {
+        self.on_project_create(req).await
+    }
+
     // ── /RUSKY FORK PATCH ──
 }

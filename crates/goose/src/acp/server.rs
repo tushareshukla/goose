@@ -109,6 +109,12 @@ pub mod rusky_chat;
 // _rusky/network/test_connection — Settings → Network test-connection probe.
 // Always compiled; reads `RUSKY_NETWORK_PROXY_URL` config + env fallback.
 pub mod rusky_network;
+// _rusky/projects/create — lightweight project-folder creation for the
+// sidebar "+ New Project" CTA. Always compiled; the FE refreshes its
+// project list via the existing `_goose/sources/list` channel.
+// `pub` so the integration test crate can call the helpers directly
+// without spinning up a full agent harness.
+pub mod rusky_projects;
 // ── /RUSKY FORK PATCH ──
 
 pub type AcpProviderFactory = Arc<

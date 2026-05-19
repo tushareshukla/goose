@@ -2035,3 +2035,45 @@ pub struct NetworkTestConnectionResponse {
 }
 
 // ── /RUSKY FORK PATCH: _rusky/network/test_connection ────────────────────────
+
+// ── RUSKY FORK PATCH: _rusky/projects/create ─────────────────────────────────
+//
+// Lightweight ACP method that creates a Rusky project on disk and
+// returns its id + root path. The renderer-side "+ New Project" CTA in
+// `SidebarProjectAccordion` calls this method; the goose-side handler
+// (`crates/goose/src/acp/server/rusky_projects.rs`) owns the
+// directory-creation + marker-file write.
+//
+// Scope is intentionally narrow: name + optional parent directory. The
+// richer project metadata (icon, color, prompt, working dirs) still
+// flows through the existing `_goose/sources/*` channel and the
+// `CreateProjectDialog` UX. This method is the lowest-friction path for
+// the sidebar — type a name, get a folder.
+
+/// Create a Rusky project directory and return its identity.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/projects/create", response = CreateProjectResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateProjectRequest {
+    /// Display name for the project. 1-64 characters. May not contain
+    /// path-separator characters (`/`, `\`) or parent-directory tokens
+    /// (`..`) — these would let a malicious caller escape `parent_dir`.
+    pub name: String,
+    /// Optional parent directory under which the project folder is
+    /// created. When `None` the handler uses
+    /// `~/Documents/Rusky Projects/` (created on demand).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_dir: Option<String>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateProjectResponse {
+    /// Stable project identifier (UUID v4) persisted in the marker
+    /// file. Independent of folder rename / move on disk.
+    pub project_id: String,
+    /// Absolute path to the project's root directory on disk.
+    pub root_path: String,
+}
+
+// ── /RUSKY FORK PATCH: _rusky/projects/create ────────────────────────────────
