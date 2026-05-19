@@ -584,7 +584,7 @@ export type PreferencesReadRequest = {
     keys?: Array<PreferenceKey>;
 };
 
-export type PreferenceKey = 'autoCompactThreshold' | 'voiceAutoSubmitPhrases' | 'voiceDictationProvider' | 'voiceDictationPreferredMic';
+export type PreferenceKey = 'autoCompactThreshold' | 'voiceAutoSubmitPhrases' | 'voiceDictationProvider' | 'voiceDictationPreferredMic' | 'personalityState' | 'privacyTelemetryCrashReports' | 'privacyDeleteAllLocalData' | 'privacyOutboundDataInventory' | 'networkProxyMode' | 'networkProxyUrl' | 'networkCustomCaBundlePath' | 'networkAllowSelfSignedCerts' | 'networkAllowedDomains' | 'soundEnabled' | 'soundNotificationVolume' | 'soundHeartbeatChime' | 'soundAutomationCompleteChime' | 'soundErrorChime' | 'keyboardGlobalShortcuts';
 
 export type PreferencesReadResponse = {
     values: Array<PreferenceValue>;
@@ -1054,17 +1054,168 @@ export type DictationModelSelectRequest = {
     modelId: string;
 };
 
+/**
+ * Returns the loaded distro manifest. Called once at app boot by the
+ * React app to populate the distro Zustand store. Session-independent.
+ */
+export type DistroInfoRequest = {
+    [key: string]: unknown;
+};
+
+export type DistroInfoResponse = {
+    /**
+     * All feature toggles from SPEC-012 §5.
+     */
+    featureToggles: {
+        [key: string]: boolean;
+    };
+    /**
+     * Ordered list of allowed MCP ids from SPEC-012 §5.
+     */
+    extensionAllowlist: Array<string>;
+    /**
+     * SemVer matching Tauri package.version (CI-gated per SPEC-012 AC-10).
+     */
+    appVersion: string;
+    /**
+     * ISO-8601 timestamp when the distro.json was last read (process start time).
+     */
+    lockedAt: string;
+};
+
+/**
+ * Per-bucket and total byte counts shown in Settings → Storage.
+ */
+export type StorageSizesRequest = {
+    [key: string]: unknown;
+};
+
+export type StorageSizesResponse = {
+    /**
+     * Bytes used by the platform cache dir (Project Rusky). Cleared by
+     * `_rusky/storage/clear_cache`.
+     */
+    cacheBytes: number;
+    /**
+     * Bytes used by the goose sessions directory (sqlite + legacy JSON).
+     */
+    sessionsBytes: number;
+    /**
+     * Bytes used by the on-disk memory store (`memory.sqlite` under data dir).
+     */
+    memoryBytes: number;
+    /**
+     * Sum of the three buckets. Convenience field — clients can render
+     * the headline figure without re-summing.
+     */
+    totalBytes: number;
+};
+
+/**
+ * Wipe the platform cache directory (`~/Library/Caches/Project Rusky*`
+ * on macOS, equivalents on Linux/Windows). Idempotent — clearing an
+ * already-empty cache returns `bytes_freed = 0` without erroring.
+ */
+export type StorageClearCacheRequest = {
+    [key: string]: unknown;
+};
+
+export type StorageClearCacheResponse = {
+    /**
+     * Total bytes reclaimed by the wipe (best-effort — counted before
+     * removal so per-file races still produce a useful figure).
+     */
+    bytesFreed: number;
+};
+
+/**
+ * Stream the sessions dir into a tarball. When `target_path` is supplied
+ * the tarball is written there directly (the desktop shell drives this
+ * via the OS save-file dialog). Otherwise it lands under the platform
+ * temp dir and the caller is expected to move it before the OS prunes.
+ */
+export type SessionsExportRequest = {
+    /**
+     * Optional absolute path. When provided the handler skips the temp
+     * dir hop and writes directly to this location.
+     */
+    targetPath?: string | null;
+};
+
+export type SessionsExportResponse = {
+    /**
+     * Absolute path to the produced `.tar.gz`. Lives under the platform
+     * temp dir — caller is expected to copy/move it before the OS prunes
+     * it.
+     */
+    tarballPath: string;
+    /**
+     * Uncompressed bytes written. Useful for activity-feed messages.
+     */
+    bytesWritten: number;
+};
+
+/**
+ * Inflate a user-picked tarball back into the sessions directory.
+ * Skips any entry whose normalized path would escape the dir (defense
+ * against zip-slip).
+ */
+export type SessionsImportRequest = {
+    /**
+     * Absolute path to the tarball the user picked. Anything readable
+     * from the goose process is fine.
+     */
+    tarballPath: string;
+};
+
+export type SessionsImportResponse = {
+    /**
+     * Count of files successfully extracted into the sessions dir.
+     */
+    importedCount: number;
+};
+
+/**
+ * Probe the rusky-proxy for reachability.
+ */
+export type NetworkTestConnectionRequest = {
+    /**
+     * Optional override. When set, the handler probes this URL instead
+     * of the configured `networkProxyUrl` preference. The probe always
+     * appends `/health`, so callers should pass the proxy base URL
+     * (e.g. `https://proxy.example.com:8080`).
+     */
+    proxyUrl?: string | null;
+};
+
+export type NetworkTestConnectionResponse = {
+    /**
+     * `true` when `/health` returned a 2xx response.
+     */
+    ok: boolean;
+    /**
+     * Round-trip latency in milliseconds, populated when `ok == true`.
+     */
+    latencyMs?: number | null;
+    /**
+     * Human-readable error string, populated when `ok == false`. Safe
+     * to display in the settings pane — never carries provider tokens
+     * or PII.
+     */
+    error?: string | null;
+};
+
 export type ExtRequest = {
     id: string;
     method: string;
-    params?: AddExtensionRequest | RemoveExtensionRequest | GetToolsRequest | GooseToolCallRequest | ReadResourceRequest | UpdateWorkingDirRequest | DeleteSessionRequest | GetExtensionsRequest | AddConfigExtensionRequest | RemoveConfigExtensionRequest | ToggleConfigExtensionRequest | GetSessionExtensionsRequest | ListProvidersRequest | ProviderCatalogListRequest | ProviderSetupCatalogListRequest | ProviderCatalogTemplateRequest | CustomProviderCreateRequest | CustomProviderReadRequest | CustomProviderUpdateRequest | CustomProviderDeleteRequest | RefreshProviderInventoryRequest | ProviderConfigReadRequest | ProviderConfigStatusRequest | ProviderConfigSaveRequest | ProviderConfigDeleteRequest | ProviderConfigAuthenticateRequest | PreferencesReadRequest | PreferencesSaveRequest | PreferencesRemoveRequest | DefaultsReadRequest | DefaultsSaveRequest | OnboardingImportScanRequest | OnboardingImportApplyRequest | ExportSessionRequest | ImportSessionRequest | UpdateSessionProjectRequest | RenameSessionRequest | ArchiveSessionRequest | UnarchiveSessionRequest | CreateSourceRequest | ListSourcesRequest | UpdateSourceRequest | DeleteSourceRequest | ExportSourceRequest | ImportSourcesRequest | DictationTranscribeRequest | DictationConfigRequest | DictationSecretSaveRequest | DictationSecretDeleteRequest | DictationModelsListRequest | DictationModelDownloadRequest | DictationModelDownloadProgressRequest | DictationModelCancelRequest | DictationModelDeleteRequest | DictationModelSelectRequest | {
+    params?: AddExtensionRequest | RemoveExtensionRequest | GetToolsRequest | GooseToolCallRequest | ReadResourceRequest | UpdateWorkingDirRequest | DeleteSessionRequest | GetExtensionsRequest | AddConfigExtensionRequest | RemoveConfigExtensionRequest | ToggleConfigExtensionRequest | GetSessionExtensionsRequest | ListProvidersRequest | ProviderCatalogListRequest | ProviderSetupCatalogListRequest | ProviderCatalogTemplateRequest | CustomProviderCreateRequest | CustomProviderReadRequest | CustomProviderUpdateRequest | CustomProviderDeleteRequest | RefreshProviderInventoryRequest | ProviderConfigReadRequest | ProviderConfigStatusRequest | ProviderConfigSaveRequest | ProviderConfigDeleteRequest | ProviderConfigAuthenticateRequest | PreferencesReadRequest | PreferencesSaveRequest | PreferencesRemoveRequest | DefaultsReadRequest | DefaultsSaveRequest | OnboardingImportScanRequest | OnboardingImportApplyRequest | ExportSessionRequest | ImportSessionRequest | UpdateSessionProjectRequest | RenameSessionRequest | ArchiveSessionRequest | UnarchiveSessionRequest | CreateSourceRequest | ListSourcesRequest | UpdateSourceRequest | DeleteSourceRequest | ExportSourceRequest | ImportSourcesRequest | DictationTranscribeRequest | DictationConfigRequest | DictationSecretSaveRequest | DictationSecretDeleteRequest | DictationModelsListRequest | DictationModelDownloadRequest | DictationModelDownloadProgressRequest | DictationModelCancelRequest | DictationModelDeleteRequest | DictationModelSelectRequest | DistroInfoRequest | StorageSizesRequest | StorageClearCacheRequest | SessionsExportRequest | SessionsImportRequest | NetworkTestConnectionRequest | {
         [key: string]: unknown;
     } | null;
 };
 
 export type ExtResponse = {
     id: string;
-    result?: EmptyResponse | GetToolsResponse | GooseToolCallResponse | ReadResourceResponse | GetExtensionsResponse | GetSessionExtensionsResponse | ListProvidersResponse | ProviderCatalogListResponse | ProviderSetupCatalogListResponse | ProviderCatalogTemplateResponse | CustomProviderCreateResponse | CustomProviderReadResponse | CustomProviderUpdateResponse | CustomProviderDeleteResponse | RefreshProviderInventoryResponse | ProviderConfigReadResponse | ProviderConfigStatusResponse | ProviderConfigChangeResponse | PreferencesReadResponse | DefaultsReadResponse | OnboardingImportScanResponse | OnboardingImportApplyResponse | ExportSessionResponse | ImportSessionResponse | CreateSourceResponse | ListSourcesResponse | UpdateSourceResponse | ExportSourceResponse | ImportSourcesResponse | DictationTranscribeResponse | DictationConfigResponse | DictationModelsListResponse | DictationModelDownloadProgressResponse | unknown;
+    result?: EmptyResponse | GetToolsResponse | GooseToolCallResponse | ReadResourceResponse | GetExtensionsResponse | GetSessionExtensionsResponse | ListProvidersResponse | ProviderCatalogListResponse | ProviderSetupCatalogListResponse | ProviderCatalogTemplateResponse | CustomProviderCreateResponse | CustomProviderReadResponse | CustomProviderUpdateResponse | CustomProviderDeleteResponse | RefreshProviderInventoryResponse | ProviderConfigReadResponse | ProviderConfigStatusResponse | ProviderConfigChangeResponse | PreferencesReadResponse | DefaultsReadResponse | OnboardingImportScanResponse | OnboardingImportApplyResponse | ExportSessionResponse | ImportSessionResponse | CreateSourceResponse | ListSourcesResponse | UpdateSourceResponse | ExportSourceResponse | ImportSourcesResponse | DictationTranscribeResponse | DictationConfigResponse | DictationModelsListResponse | DictationModelDownloadProgressResponse | DistroInfoResponse | StorageSizesResponse | StorageClearCacheResponse | SessionsExportResponse | SessionsImportResponse | NetworkTestConnectionResponse | unknown;
 } | {
     error: {
         code: number;

@@ -40,6 +40,8 @@ import type {
   DictationSecretSaveRequest,
   DictationTranscribeRequest,
   DictationTranscribeResponse,
+  DistroInfoRequest,
+  DistroInfoResponse,
   ExportSessionRequest,
   ExportSessionResponse,
   ExportSourceRequest,
@@ -60,6 +62,8 @@ import type {
   ListProvidersResponse,
   ListSourcesRequest,
   ListSourcesResponse,
+  NetworkTestConnectionRequest,
+  NetworkTestConnectionResponse,
   OnboardingImportApplyRequest,
   OnboardingImportApplyResponse,
   OnboardingImportScanRequest,
@@ -89,6 +93,14 @@ import type {
   RemoveConfigExtensionRequest,
   RemoveExtensionRequest,
   RenameSessionRequest,
+  SessionsExportRequest,
+  SessionsExportResponse,
+  SessionsImportRequest,
+  SessionsImportResponse,
+  StorageClearCacheRequest,
+  StorageClearCacheResponse,
+  StorageSizesRequest,
+  StorageSizesResponse,
   ToggleConfigExtensionRequest,
   UnarchiveSessionRequest,
   UpdateSessionProjectRequest,
@@ -107,6 +119,7 @@ import {
   zDictationModelDownloadProgressResponse,
   zDictationModelsListResponse,
   zDictationTranscribeResponse,
+  zDistroInfoResponse,
   zExportSessionResponse,
   zExportSourceResponse,
   zGetExtensionsResponse,
@@ -117,6 +130,7 @@ import {
   zImportSourcesResponse,
   zListProvidersResponse,
   zListSourcesResponse,
+  zNetworkTestConnectionResponse,
   zOnboardingImportApplyResponse,
   zOnboardingImportScanResponse,
   zPreferencesReadResponse,
@@ -128,6 +142,10 @@ import {
   zProviderSetupCatalogListResponse,
   zReadResourceResponse,
   zRefreshProviderInventoryResponse,
+  zSessionsExportResponse,
+  zSessionsImportResponse,
+  zStorageClearCacheResponse,
+  zStorageSizesResponse,
   zUpdateSourceResponse,
 } from './zod.gen.js';
 
@@ -565,5 +583,52 @@ export class GooseExtClient {
     params: DictationModelSelectRequest,
   ): Promise<void> {
     await this.conn.extMethod("_goose/dictation/model/select", params);
+  }
+
+  async RuskyDistroInfo(
+    params: DistroInfoRequest,
+  ): Promise<DistroInfoResponse> {
+    const raw = await this.conn.extMethod("_rusky/distro/info", params);
+    return zDistroInfoResponse.parse(raw) as DistroInfoResponse;
+  }
+
+  async RuskyStorageSizes(
+    params: StorageSizesRequest,
+  ): Promise<StorageSizesResponse> {
+    const raw = await this.conn.extMethod("_rusky/storage/sizes", params);
+    return zStorageSizesResponse.parse(raw) as StorageSizesResponse;
+  }
+
+  async RuskyStorageClearCache(
+    params: StorageClearCacheRequest,
+  ): Promise<StorageClearCacheResponse> {
+    const raw = await this.conn.extMethod("_rusky/storage/clear_cache", params);
+    return zStorageClearCacheResponse.parse(raw) as StorageClearCacheResponse;
+  }
+
+  async RuskySessionsExport(
+    params: SessionsExportRequest,
+  ): Promise<SessionsExportResponse> {
+    const raw = await this.conn.extMethod("_rusky/sessions/export", params);
+    return zSessionsExportResponse.parse(raw) as SessionsExportResponse;
+  }
+
+  async RuskySessionsImport(
+    params: SessionsImportRequest,
+  ): Promise<SessionsImportResponse> {
+    const raw = await this.conn.extMethod("_rusky/sessions/import", params);
+    return zSessionsImportResponse.parse(raw) as SessionsImportResponse;
+  }
+
+  async RuskyNetworkTestConnection(
+    params: NetworkTestConnectionRequest,
+  ): Promise<NetworkTestConnectionResponse> {
+    const raw = await this.conn.extMethod(
+      "_rusky/network/test_connection",
+      params,
+    );
+    return zNetworkTestConnectionResponse.parse(
+      raw,
+    ) as NetworkTestConnectionResponse;
   }
 }

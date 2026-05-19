@@ -299,6 +299,11 @@
       "method": "_rusky/sessions/import",
       "requestType": "SessionsImportRequest",
       "responseType": "SessionsImportResponse"
+    },
+    {
+      "method": "_rusky/network/test_connection",
+      "requestType": "NetworkTestConnectionRequest",
+      "responseType": "NetworkTestConnectionResponse"
     }
   ]
 }

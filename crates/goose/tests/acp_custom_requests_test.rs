@@ -315,6 +315,389 @@ fn test_custom_preferences_save_rejects_invalid_values() {
     });
 }
 
+// ── RUSKY FORK PATCH: personality + privacy preference tests ───────────────
+
+#[test]
+fn test_custom_preferences_personality_state_roundtrip() {
+    run_test(async {
+        let openai = OpenAiFixture::new(vec![], Arc::new(EnforceSessionId::default())).await;
+        let conn = AcpServerConnection::new(TestConnectionConfig::default(), openai).await;
+
+        // SPEC-156 personality_state shape — preset + behavior toggles
+        // + about-you proxy fields, serialized as a JSON object.
+        let payload = serde_json::json!({
+            "tone_preset": "friendly",
+            "custom_tone_text": "Be terse and witty.",
+            "match_writing_style": false,
+            "confirm_before_send": true,
+            "voice_replies_short": false,
+            "use_emoji_casual": false,
+            "address_me_as": "casual",
+            "response_length": "balanced",
+            "updated_at": "2026-05-19T12:00:00Z",
+        });
+
+        send_custom(
+            conn.cx(),
+            "_goose/preferences/save",
+            serde_json::json!({
+                "values": [{ "key": "personalityState", "value": payload }],
+            }),
+        )
+        .await
+        .expect("personality save should succeed");
+
+        let response = send_custom(
+            conn.cx(),
+            "_goose/preferences/read",
+            serde_json::json!({ "keys": ["personalityState"] }),
+        )
+        .await
+        .expect("personality read should succeed");
+        let values = response.get("values").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(values.len(), 1);
+        assert_eq!(
+            values[0].get("key"),
+            Some(&serde_json::json!("personalityState"))
+        );
+        assert_eq!(values[0].get("value"), Some(&payload));
+    });
+}
+
+#[test]
+fn test_custom_preferences_personality_state_rejects_non_object() {
+    run_test(async {
+        let openai = OpenAiFixture::new(vec![], Arc::new(EnforceSessionId::default())).await;
+        let conn = AcpServerConnection::new(TestConnectionConfig::default(), openai).await;
+
+        for bad in [
+            serde_json::json!("not-an-object"),
+            serde_json::json!(42),
+            serde_json::json!([1, 2, 3]),
+            serde_json::json!(null),
+        ] {
+            let result = send_custom(
+                conn.cx(),
+                "_goose/preferences/save",
+                serde_json::json!({
+                    "values": [{ "key": "personalityState", "value": bad }],
+                }),
+            )
+            .await;
+            assert!(
+                result.is_err(),
+                "expected invalid params for non-object personalityState"
+            );
+        }
+    });
+}
+
+#[test]
+fn test_custom_preferences_privacy_roundtrip() {
+    run_test(async {
+        let openai = OpenAiFixture::new(vec![], Arc::new(EnforceSessionId::default())).await;
+        let conn = AcpServerConnection::new(TestConnectionConfig::default(), openai).await;
+
+        // Defaults — unset reads as null.
+        let response = send_custom(
+            conn.cx(),
+            "_goose/preferences/read",
+            serde_json::json!({
+                "keys": [
+                    "privacyTelemetryCrashReports",
+                    "privacyDeleteAllLocalData",
+                    "privacyOutboundDataInventory",
+                ],
+            }),
+        )
+        .await
+        .expect("privacy read should succeed");
+        assert_eq!(
+            response.get("values"),
+            Some(&serde_json::json!([
+                { "key": "privacyTelemetryCrashReports", "value": null },
+                { "key": "privacyDeleteAllLocalData", "value": null },
+                { "key": "privacyOutboundDataInventory", "value": null },
+            ]))
+        );
+
+        send_custom(
+            conn.cx(),
+            "_goose/preferences/save",
+            serde_json::json!({
+                "values": [
+                    { "key": "privacyTelemetryCrashReports", "value": true },
+                    { "key": "privacyOutboundDataInventory", "value": true },
+                ],
+            }),
+        )
+        .await
+        .expect("privacy save should succeed");
+
+        let response = send_custom(
+            conn.cx(),
+            "_goose/preferences/read",
+            serde_json::json!({
+                "keys": [
+                    "privacyTelemetryCrashReports",
+                    "privacyOutboundDataInventory",
+                ],
+            }),
+        )
+        .await
+        .expect("privacy read after save should succeed");
+        assert_eq!(
+            response.get("values"),
+            Some(&serde_json::json!([
+                { "key": "privacyTelemetryCrashReports", "value": true },
+                { "key": "privacyOutboundDataInventory", "value": true },
+            ]))
+        );
+    });
+}
+
+#[test]
+fn test_custom_preferences_privacy_rejects_non_bool() {
+    run_test(async {
+        let openai = OpenAiFixture::new(vec![], Arc::new(EnforceSessionId::default())).await;
+        let conn = AcpServerConnection::new(TestConnectionConfig::default(), openai).await;
+
+        for bad in [
+            serde_json::json!("yes"),
+            serde_json::json!(1),
+            serde_json::json!(null),
+            serde_json::json!({"v": true}),
+        ] {
+            let result = send_custom(
+                conn.cx(),
+                "_goose/preferences/save",
+                serde_json::json!({
+                    "values": [{ "key": "privacyTelemetryCrashReports", "value": bad }],
+                }),
+            )
+            .await;
+            assert!(
+                result.is_err(),
+                "expected invalid params for non-bool privacy value"
+            );
+        }
+    });
+}
+
+// ── /RUSKY FORK PATCH: personality + privacy preference tests ──────────────
+
+// ── RUSKY FORK PATCH: sound + keyboard preference tests (G8) ───────────────
+
+#[test]
+fn test_custom_preferences_sound_roundtrip() {
+    run_test(async {
+        let openai = OpenAiFixture::new(vec![], Arc::new(EnforceSessionId::default())).await;
+        let conn = AcpServerConnection::new(TestConnectionConfig::default(), openai).await;
+
+        // Save every sound preference at once.
+        send_custom(
+            conn.cx(),
+            "_goose/preferences/save",
+            serde_json::json!({
+                "values": [
+                    { "key": "soundEnabled", "value": false },
+                    { "key": "soundNotificationVolume", "value": 0.42 },
+                    { "key": "soundHeartbeatChime", "value": true },
+                    { "key": "soundAutomationCompleteChime", "value": false },
+                    { "key": "soundErrorChime", "value": true },
+                ],
+            }),
+        )
+        .await
+        .expect("sound preferences save should succeed");
+
+        let response = send_custom(
+            conn.cx(),
+            "_goose/preferences/read",
+            serde_json::json!({
+                "keys": [
+                    "soundEnabled",
+                    "soundNotificationVolume",
+                    "soundHeartbeatChime",
+                    "soundAutomationCompleteChime",
+                    "soundErrorChime",
+                ],
+            }),
+        )
+        .await
+        .expect("sound preferences read should succeed");
+
+        assert_eq!(
+            response.get("values"),
+            Some(&serde_json::json!([
+                { "key": "soundEnabled", "value": false },
+                { "key": "soundNotificationVolume", "value": 0.42 },
+                { "key": "soundHeartbeatChime", "value": true },
+                { "key": "soundAutomationCompleteChime", "value": false },
+                { "key": "soundErrorChime", "value": true },
+            ]))
+        );
+    });
+}
+
+#[test]
+fn test_custom_preferences_sound_rejects_invalid() {
+    run_test(async {
+        let openai = OpenAiFixture::new(vec![], Arc::new(EnforceSessionId::default())).await;
+        let conn = AcpServerConnection::new(TestConnectionConfig::default(), openai).await;
+
+        let invalid = [
+            serde_json::json!({
+                "values": [{ "key": "soundNotificationVolume", "value": 1.5 }],
+            }),
+            serde_json::json!({
+                "values": [{ "key": "soundNotificationVolume", "value": -0.1 }],
+            }),
+            serde_json::json!({
+                "values": [{ "key": "soundNotificationVolume", "value": "loud" }],
+            }),
+            serde_json::json!({
+                "values": [{ "key": "soundEnabled", "value": 1 }],
+            }),
+            serde_json::json!({
+                "values": [{ "key": "soundHeartbeatChime", "value": "yes" }],
+            }),
+        ];
+
+        for payload in invalid {
+            let result = send_custom(conn.cx(), "_goose/preferences/save", payload).await;
+            assert!(result.is_err(), "expected invalid params error");
+        }
+    });
+}
+
+#[test]
+fn test_custom_preferences_keyboard_roundtrip() {
+    run_test(async {
+        let openai = OpenAiFixture::new(vec![], Arc::new(EnforceSessionId::default())).await;
+        let conn = AcpServerConnection::new(TestConnectionConfig::default(), openai).await;
+
+        let shortcuts = serde_json::json!({
+            "widgetToggle": "CommandOrControl+Shift+R",
+            "indicatorStop": "CommandOrControl+Shift+Period",
+            "appQuit": "CommandOrControl+Q",
+        });
+
+        send_custom(
+            conn.cx(),
+            "_goose/preferences/save",
+            serde_json::json!({
+                "values": [
+                    { "key": "keyboardGlobalShortcuts", "value": shortcuts.clone() }
+                ],
+            }),
+        )
+        .await
+        .expect("keyboard shortcuts save should succeed");
+
+        let response = send_custom(
+            conn.cx(),
+            "_goose/preferences/read",
+            serde_json::json!({ "keys": ["keyboardGlobalShortcuts"] }),
+        )
+        .await
+        .expect("keyboard shortcuts read should succeed");
+
+        assert_eq!(
+            response.get("values"),
+            Some(&serde_json::json!([
+                { "key": "keyboardGlobalShortcuts", "value": shortcuts }
+            ]))
+        );
+    });
+}
+
+#[test]
+fn test_custom_preferences_keyboard_partial_and_remove() {
+    run_test(async {
+        let openai = OpenAiFixture::new(vec![], Arc::new(EnforceSessionId::default())).await;
+        let conn = AcpServerConnection::new(TestConnectionConfig::default(), openai).await;
+
+        send_custom(
+            conn.cx(),
+            "_goose/preferences/save",
+            serde_json::json!({
+                "values": [{
+                    "key": "keyboardGlobalShortcuts",
+                    "value": { "widgetToggle": "CommandOrControl+Shift+R" }
+                }],
+            }),
+        )
+        .await
+        .expect("partial keyboard shortcuts save should succeed");
+
+        send_custom(
+            conn.cx(),
+            "_goose/preferences/remove",
+            serde_json::json!({ "keys": ["keyboardGlobalShortcuts"] }),
+        )
+        .await
+        .expect("keyboard shortcuts remove should succeed");
+
+        let response = send_custom(
+            conn.cx(),
+            "_goose/preferences/read",
+            serde_json::json!({ "keys": ["keyboardGlobalShortcuts"] }),
+        )
+        .await
+        .expect("read after remove should succeed");
+
+        assert_eq!(
+            response.get("values"),
+            Some(&serde_json::json!([
+                { "key": "keyboardGlobalShortcuts", "value": null }
+            ]))
+        );
+    });
+}
+
+#[test]
+fn test_custom_preferences_keyboard_rejects_invalid() {
+    run_test(async {
+        let openai = OpenAiFixture::new(vec![], Arc::new(EnforceSessionId::default())).await;
+        let conn = AcpServerConnection::new(TestConnectionConfig::default(), openai).await;
+
+        let invalid = [
+            serde_json::json!({
+                "values": [{
+                    "key": "keyboardGlobalShortcuts",
+                    "value": { "unknownAction": "Cmd+X" }
+                }],
+            }),
+            serde_json::json!({
+                "values": [{
+                    "key": "keyboardGlobalShortcuts",
+                    "value": { "widgetToggle": 42 }
+                }],
+            }),
+            serde_json::json!({
+                "values": [{
+                    "key": "keyboardGlobalShortcuts",
+                    "value": { "appQuit": "  " }
+                }],
+            }),
+            serde_json::json!({
+                "values": [{
+                    "key": "keyboardGlobalShortcuts",
+                    "value": ["Cmd+R"]
+                }],
+            }),
+        ];
+
+        for payload in invalid {
+            let result = send_custom(conn.cx(), "_goose/preferences/save", payload).await;
+            assert!(result.is_err(), "expected invalid params error");
+        }
+    });
+}
+
+// ── /RUSKY FORK PATCH: sound + keyboard preference tests (G8) ──────────────
+
 #[test]
 fn test_custom_defaults_read() {
     run_test(async {

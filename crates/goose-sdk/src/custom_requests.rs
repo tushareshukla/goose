@@ -208,6 +208,22 @@ pub enum PreferenceKey {
     VoiceAutoSubmitPhrases,
     VoiceDictationProvider,
     VoiceDictationPreferredMic,
+    // ── RUSKY FORK PATCH: personality state (SPEC-156) ───────────────────────
+    /// Rusky personality state — preset + behavior toggles + about-you
+    /// fields, serialized as a JSON object. See SPEC-156 §API contract.
+    PersonalityState,
+    // ── /RUSKY FORK PATCH: personality state ─────────────────────────────────
+    // ── RUSKY FORK PATCH: privacy preferences (SPEC-100) ─────────────────────
+    /// Rusky privacy — opt-in crash report telemetry. Bool. Default off.
+    PrivacyTelemetryCrashReports,
+    /// Rusky privacy — destructive action flag set when a "Delete all
+    /// local data" request is in progress. Bool. Cleared once the
+    /// shell-side wipe completes.
+    PrivacyDeleteAllLocalData,
+    /// Rusky privacy — whether the Privacy pane should reveal the
+    /// outbound data inventory (what touches the wire). Bool. Default off.
+    PrivacyOutboundDataInventory,
+    // ── /RUSKY FORK PATCH: privacy preferences ───────────────────────────────
     // ── RUSKY FORK PATCH: network preferences ────────────────────────────────
     /// Rusky network — proxy mode for the rusky-proxy connection.
     /// String value, one of: `"none" | "auto" | "manual"`. Default `"none"`.
@@ -227,6 +243,26 @@ pub enum PreferenceKey {
     /// pane). JSON array of strings.
     NetworkAllowedDomains,
     // ── /RUSKY FORK PATCH: network preferences ───────────────────────────────
+    // ── RUSKY FORK PATCH: sound preferences (G8) ─────────────────────────────
+    /// Rusky sound — master notification toggle. Bool. Default `true`.
+    SoundEnabled,
+    /// Rusky sound — notification mix volume. Number in `[0.0, 1.0]`.
+    SoundNotificationVolume,
+    /// Rusky sound — heartbeat tick chime toggle. Bool.
+    SoundHeartbeatChime,
+    /// Rusky sound — automation-complete chime toggle. Bool.
+    SoundAutomationCompleteChime,
+    /// Rusky sound — error chime toggle. Bool.
+    SoundErrorChime,
+    // ── /RUSKY FORK PATCH: sound preferences (G8) ────────────────────────────
+    // ── RUSKY FORK PATCH: keyboard preferences (G8) ──────────────────────────
+    /// Rusky keyboard — global shortcuts table. JSON object shaped
+    /// `{ widgetToggle, indicatorStop, appQuit }` of Tauri accelerator
+    /// strings (e.g. `"CommandOrControl+Shift+R"`). Defaults from
+    /// SPEC-154. Re-registered by the desktop shell on save via the
+    /// `apply_global_shortcuts` Tauri command.
+    KeyboardGlobalShortcuts,
+    // ── /RUSKY FORK PATCH: keyboard preferences (G8) ─────────────────────────
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]

@@ -1461,12 +1461,91 @@
       "x-method": "_goose/preferences/read"
     },
     "PreferenceKey": {
-      "type": "string",
-      "enum": [
-        "autoCompactThreshold",
-        "voiceAutoSubmitPhrases",
-        "voiceDictationProvider",
-        "voiceDictationPreferredMic"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "autoCompactThreshold",
+            "voiceAutoSubmitPhrases",
+            "voiceDictationProvider",
+            "voiceDictationPreferredMic"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "personalityState",
+          "description": "Rusky personality state — preset + behavior toggles + about-you\nfields, serialized as a JSON object. See SPEC-156 §API contract."
+        },
+        {
+          "type": "string",
+          "const": "privacyTelemetryCrashReports",
+          "description": "Rusky privacy — opt-in crash report telemetry. Bool. Default off."
+        },
+        {
+          "type": "string",
+          "const": "privacyDeleteAllLocalData",
+          "description": "Rusky privacy — destructive action flag set when a \"Delete all\nlocal data\" request is in progress. Bool. Cleared once the\nshell-side wipe completes."
+        },
+        {
+          "type": "string",
+          "const": "privacyOutboundDataInventory",
+          "description": "Rusky privacy — whether the Privacy pane should reveal the\noutbound data inventory (what touches the wire). Bool. Default off."
+        },
+        {
+          "type": "string",
+          "const": "networkProxyMode",
+          "description": "Rusky network — proxy mode for the rusky-proxy connection.\nString value, one of: `\"none\" | \"auto\" | \"manual\"`. Default `\"none\"`."
+        },
+        {
+          "type": "string",
+          "const": "networkProxyUrl",
+          "description": "Rusky network — override URL for the rusky-proxy. Used when\n`networkProxyMode == \"manual\"`, or to point the dev app at a\nnon-default proxy. Empty string clears the override; the goose\nclient falls back to `RUSKY_PROXY_URL`. String."
+        },
+        {
+          "type": "string",
+          "const": "networkCustomCaBundlePath",
+          "description": "Rusky network — absolute filesystem path to a custom CA bundle\n(PEM). Empty string clears it. String."
+        },
+        {
+          "type": "string",
+          "const": "networkAllowSelfSignedCerts",
+          "description": "Rusky network — if `true`, the proxy client accepts self-signed\ncerts. Default `false`. Bool (advanced)."
+        },
+        {
+          "type": "string",
+          "const": "networkAllowedDomains",
+          "description": "Rusky network — proxy-allowed domain list (used by the browser\npane). JSON array of strings."
+        },
+        {
+          "type": "string",
+          "const": "soundEnabled",
+          "description": "Rusky sound — master notification toggle. Bool. Default `true`."
+        },
+        {
+          "type": "string",
+          "const": "soundNotificationVolume",
+          "description": "Rusky sound — notification mix volume. Number in `[0.0, 1.0]`."
+        },
+        {
+          "type": "string",
+          "const": "soundHeartbeatChime",
+          "description": "Rusky sound — heartbeat tick chime toggle. Bool."
+        },
+        {
+          "type": "string",
+          "const": "soundAutomationCompleteChime",
+          "description": "Rusky sound — automation-complete chime toggle. Bool."
+        },
+        {
+          "type": "string",
+          "const": "soundErrorChime",
+          "description": "Rusky sound — error chime toggle. Bool."
+        },
+        {
+          "type": "string",
+          "const": "keyboardGlobalShortcuts",
+          "description": "Rusky keyboard — global shortcuts table. JSON object shaped\n`{ widgetToggle, indicatorStop, appQuit }` of Tauri accelerator\nstrings (e.g. `\"CommandOrControl+Shift+R\"`). Defaults from\nSPEC-154. Re-registered by the desktop shell on save via the\n`apply_global_shortcuts` Tauri command."
+        }
       ]
     },
     "PreferencesReadResponse": {
@@ -2711,6 +2790,51 @@
       "x-side": "agent",
       "x-method": "_rusky/sessions/import"
     },
+    "NetworkTestConnectionRequest": {
+      "type": "object",
+      "properties": {
+        "proxyUrl": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional override. When set, the handler probes this URL instead\nof the configured `networkProxyUrl` preference. The probe always\nappends `/health`, so callers should pass the proxy base URL\n(e.g. `https://proxy.example.com:8080`)."
+        }
+      },
+      "description": "Probe the rusky-proxy for reachability.",
+      "x-side": "agent",
+      "x-method": "_rusky/network/test_connection"
+    },
+    "NetworkTestConnectionResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "description": "`true` when `/health` returned a 2xx response."
+        },
+        "latencyMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Round-trip latency in milliseconds, populated when `ok == true`."
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Human-readable error string, populated when `ok == false`. Safe\nto display in the settings pane — never carries provider tokens\nor PII."
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "x-side": "agent",
+      "x-method": "_rusky/network/test_connection"
+    },
     "ExtRequest": {
       "properties": {
         "id": {
@@ -3262,6 +3386,15 @@
                   ],
                   "description": "Params for _rusky/sessions/import",
                   "title": "SessionsImportRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/NetworkTestConnectionRequest"
+                    }
+                  ],
+                  "description": "Params for _rusky/network/test_connection",
+                  "title": "NetworkTestConnectionRequest"
                 }
               ]
             },
@@ -3596,6 +3729,14 @@
                         }
                       ],
                       "title": "SessionsImportResponse"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/NetworkTestConnectionResponse"
+                        }
+                      ],
+                      "title": "NetworkTestConnectionResponse"
                     }
                   ]
                 },

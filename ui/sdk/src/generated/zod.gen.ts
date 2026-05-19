@@ -570,11 +570,26 @@ export const zProviderConfigAuthenticateRequest = z.object({
     providerId: z.string()
 });
 
-export const zPreferenceKey = z.enum([
-    'autoCompactThreshold',
-    'voiceAutoSubmitPhrases',
-    'voiceDictationProvider',
-    'voiceDictationPreferredMic'
+export const zPreferenceKey = z.union([
+    z.literal('autoCompactThreshold'),
+    z.literal('voiceAutoSubmitPhrases'),
+    z.literal('voiceDictationProvider'),
+    z.literal('voiceDictationPreferredMic'),
+    z.literal('personalityState'),
+    z.literal('privacyTelemetryCrashReports'),
+    z.literal('privacyDeleteAllLocalData'),
+    z.literal('privacyOutboundDataInventory'),
+    z.literal('networkProxyMode'),
+    z.literal('networkProxyUrl'),
+    z.literal('networkCustomCaBundlePath'),
+    z.literal('networkAllowSelfSignedCerts'),
+    z.literal('networkAllowedDomains'),
+    z.literal('soundEnabled'),
+    z.literal('soundNotificationVolume'),
+    z.literal('soundHeartbeatChime'),
+    z.literal('soundAutomationCompleteChime'),
+    z.literal('soundErrorChime'),
+    z.literal('keyboardGlobalShortcuts')
 ]);
 
 /**
@@ -1046,6 +1061,95 @@ export const zDictationModelSelectRequest = z.object({
     modelId: z.string()
 });
 
+/**
+ * Returns the loaded distro manifest. Called once at app boot by the
+ * React app to populate the distro Zustand store. Session-independent.
+ */
+export const zDistroInfoRequest = z.record(z.unknown());
+
+export const zDistroInfoResponse = z.object({
+    featureToggles: z.record(z.boolean()),
+    extensionAllowlist: z.array(z.string()),
+    appVersion: z.string(),
+    lockedAt: z.string()
+});
+
+/**
+ * Per-bucket and total byte counts shown in Settings → Storage.
+ */
+export const zStorageSizesRequest = z.record(z.unknown());
+
+export const zStorageSizesResponse = z.object({
+    cacheBytes: z.number().int().gte(0),
+    sessionsBytes: z.number().int().gte(0),
+    memoryBytes: z.number().int().gte(0),
+    totalBytes: z.number().int().gte(0)
+});
+
+/**
+ * Wipe the platform cache directory (`~/Library/Caches/Project Rusky*`
+ * on macOS, equivalents on Linux/Windows). Idempotent — clearing an
+ * already-empty cache returns `bytes_freed = 0` without erroring.
+ */
+export const zStorageClearCacheRequest = z.record(z.unknown());
+
+export const zStorageClearCacheResponse = z.object({
+    bytesFreed: z.number().int().gte(0)
+});
+
+/**
+ * Stream the sessions dir into a tarball. When `target_path` is supplied
+ * the tarball is written there directly (the desktop shell drives this
+ * via the OS save-file dialog). Otherwise it lands under the platform
+ * temp dir and the caller is expected to move it before the OS prunes.
+ */
+export const zSessionsExportRequest = z.object({
+    targetPath: z.union([
+        z.string(),
+        z.null()
+    ]).optional()
+});
+
+export const zSessionsExportResponse = z.object({
+    tarballPath: z.string(),
+    bytesWritten: z.number().int().gte(0)
+});
+
+/**
+ * Inflate a user-picked tarball back into the sessions directory.
+ * Skips any entry whose normalized path would escape the dir (defense
+ * against zip-slip).
+ */
+export const zSessionsImportRequest = z.object({
+    tarballPath: z.string()
+});
+
+export const zSessionsImportResponse = z.object({
+    importedCount: z.number().int().gte(0)
+});
+
+/**
+ * Probe the rusky-proxy for reachability.
+ */
+export const zNetworkTestConnectionRequest = z.object({
+    proxyUrl: z.union([
+        z.string(),
+        z.null()
+    ]).optional()
+});
+
+export const zNetworkTestConnectionResponse = z.object({
+    ok: z.boolean(),
+    latencyMs: z.union([
+        z.number().int().gte(0).max(4294967295, { message: 'Invalid value: Expected uint32 to be <= 4294967295' }),
+        z.null()
+    ]).optional(),
+    error: z.union([
+        z.string(),
+        z.null()
+    ]).optional()
+});
+
 export const zExtRequest = z.object({
     id: z.string(),
     method: z.string(),
@@ -1105,7 +1209,13 @@ export const zExtRequest = z.object({
             zDictationModelDownloadProgressRequest,
             zDictationModelCancelRequest,
             zDictationModelDeleteRequest,
-            zDictationModelSelectRequest
+            zDictationModelSelectRequest,
+            zDistroInfoRequest,
+            zStorageSizesRequest,
+            zStorageClearCacheRequest,
+            zSessionsExportRequest,
+            zSessionsImportRequest,
+            zNetworkTestConnectionRequest
         ]),
         z.union([
             z.record(z.unknown()),
@@ -1151,7 +1261,13 @@ export const zExtResponse = z.union([
                 zDictationTranscribeResponse,
                 zDictationConfigResponse,
                 zDictationModelsListResponse,
-                zDictationModelDownloadProgressResponse
+                zDictationModelDownloadProgressResponse,
+                zDistroInfoResponse,
+                zStorageSizesResponse,
+                zStorageClearCacheResponse,
+                zSessionsExportResponse,
+                zSessionsImportResponse,
+                zNetworkTestConnectionResponse
             ]),
             z.unknown()
         ]).optional()
