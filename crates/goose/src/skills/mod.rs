@@ -425,3 +425,144 @@ pub fn list_installed_skills(working_dir: Option<&Path>) -> Vec<SourceEntry> {
     };
     discover_skills(wd)
 }
+
+#[cfg(test)]
+mod tests {
+    //! Rusky §05d Skills audit — these tests pin the SKILL.md loader
+    //! contract that the desktop UI depends on:
+    //!
+    //!   * AC-A1: every bundled SKILL.md has well-formed frontmatter
+    //!     and parses cleanly via `parse_skill_content`.
+    //!   * AC-A2: the spec's curated bundle (§05d, lines 3753-3787)
+    //!     is shipped — by name, not just by file count — so a
+    //!     filename rename can't silently drop one.
+    //!   * AC-A3: every bundled skill exposes a non-empty
+    //!     `description` (the frontmatter field the agent matches
+    //!     against to auto-load).
+    //!   * AC-A4: bundled skills are flagged `BuiltinSkill` so the
+    //!     UI can label them "Built in" and disable destructive
+    //!     actions.
+    use super::*;
+    use goose_sdk::custom_requests::SourceType;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    /// Spec §05d, list-rows in lines 3753-3787. If you rename a
+    /// bundled skill, update this list (and the spec) — don't ship
+    /// the rename silently.
+    const SPEC_BUNDLED_SKILLS: &[&str] = &[
+        "email-response-style",
+        "meeting-notes",
+        "code-review-checklist",
+        "calendar-triage",
+        "research-synthesis",
+        "writing-personality",
+        "file-organization",
+    ];
+
+    fn builtin_sources() -> Vec<SourceEntry> {
+        builtin::get_all()
+            .into_iter()
+            .filter_map(|content| parse_skill_content(content, &PathBuf::new(), true))
+            .collect()
+    }
+
+    #[test]
+    fn bundled_skill_frontmatter_parses() {
+        // AC-A1
+        let contents = builtin::get_all();
+        assert!(
+            !contents.is_empty(),
+            "builtin::get_all() returned no skills"
+        );
+        for content in contents {
+            let parsed = parse_skill_content(content, &PathBuf::new(), true);
+            assert!(
+                parsed.is_some(),
+                "a bundled SKILL.md failed to parse — first 200 chars: {}",
+                content.chars().take(200).collect::<String>()
+            );
+        }
+    }
+
+    #[test]
+    fn spec_bundled_skills_are_shipped() {
+        // AC-A2
+        let names: Vec<String> = builtin_sources().iter().map(|s| s.name.clone()).collect();
+        for expected in SPEC_BUNDLED_SKILLS {
+            assert!(
+                names.iter().any(|n| n == expected),
+                "spec §05d requires bundled skill '{}'. shipped: {:?}",
+                expected,
+                names
+            );
+        }
+    }
+
+    #[test]
+    fn every_bundled_skill_has_a_description() {
+        // AC-A3 — empty description means the agent can't auto-match.
+        for source in builtin_sources() {
+            assert!(
+                !source.description.trim().is_empty(),
+                "bundled skill '{}' has an empty description; auto-load matching needs it",
+                source.name
+            );
+        }
+    }
+
+    #[test]
+    fn discover_skills_tags_builtins_as_builtin_skill() {
+        // AC-A4
+        let sources = discover_skills(None);
+        let builtins: Vec<_> = sources
+            .iter()
+            .filter(|s| s.source_type == SourceType::BuiltinSkill)
+            .collect();
+        assert!(
+            builtins.len() >= SPEC_BUNDLED_SKILLS.len(),
+            "expected at least {} BuiltinSkill entries; found {}",
+            SPEC_BUNDLED_SKILLS.len(),
+            builtins.len()
+        );
+        for source in builtins {
+            assert!(
+                source.path.starts_with("builtin://skills/"),
+                "BuiltinSkill '{}' has non-builtin path '{}'",
+                source.name,
+                source.path
+            );
+            assert!(source.global, "BuiltinSkill '{}' must be global", source.name);
+        }
+    }
+
+    #[test]
+    fn project_skill_overrides_builtin_by_name() {
+        // Spec §05d: project + global both load; project precedence
+        // matters so users can override a bundle they don't like.
+        let tmp = TempDir::new().unwrap();
+        let project_root = tmp.path();
+        let skills_dir = project_root.join(".agents").join("skills").join("meeting-notes");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+        std::fs::write(
+            skills_dir.join("SKILL.md"),
+            "---\nname: meeting-notes\ndescription: Project override\n---\n\n# Project meeting notes\n",
+        )
+        .unwrap();
+
+        let sources = discover_skills(Some(project_root));
+        let meeting_notes: Vec<_> = sources
+            .iter()
+            .filter(|s| s.name == "meeting-notes")
+            .collect();
+        assert_eq!(
+            meeting_notes.len(),
+            1,
+            "project override must dedup against the builtin"
+        );
+        assert_eq!(
+            meeting_notes[0].description, "Project override",
+            "project SKILL.md must win over the bundled version"
+        );
+    }
+}
