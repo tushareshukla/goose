@@ -208,6 +208,25 @@ pub enum PreferenceKey {
     VoiceAutoSubmitPhrases,
     VoiceDictationProvider,
     VoiceDictationPreferredMic,
+    // ── RUSKY FORK PATCH: network preferences ────────────────────────────────
+    /// Rusky network — proxy mode for the rusky-proxy connection.
+    /// String value, one of: `"none" | "auto" | "manual"`. Default `"none"`.
+    NetworkProxyMode,
+    /// Rusky network — override URL for the rusky-proxy. Used when
+    /// `networkProxyMode == "manual"`, or to point the dev app at a
+    /// non-default proxy. Empty string clears the override; the goose
+    /// client falls back to `RUSKY_PROXY_URL`. String.
+    NetworkProxyUrl,
+    /// Rusky network — absolute filesystem path to a custom CA bundle
+    /// (PEM). Empty string clears it. String.
+    NetworkCustomCaBundlePath,
+    /// Rusky network — if `true`, the proxy client accepts self-signed
+    /// certs. Default `false`. Bool (advanced).
+    NetworkAllowSelfSignedCerts,
+    /// Rusky network — proxy-allowed domain list (used by the browser
+    /// pane). JSON array of strings.
+    NetworkAllowedDomains,
+    // ── /RUSKY FORK PATCH: network preferences ───────────────────────────────
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]
@@ -1941,3 +1960,42 @@ pub struct SessionsImportResponse {
 }
 
 // ── /RUSKY FORK PATCH: _rusky/storage/* ──────────────────────────────────────
+
+// ── RUSKY FORK PATCH: _rusky/network/test_connection ─────────────────────────
+//
+// Connectivity probe for the rusky-proxy. The Network settings pane
+// surfaces this as a "Test connection" button; the handler does a
+// short-timeout HTTP GET against the proxy's `/health` endpoint using
+// the override URL (or the configured `networkProxyUrl` preference).
+//
+// Backend lives in `crates/goose/src/acp/server/rusky_network.rs`.
+
+/// Probe the rusky-proxy for reachability.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/network/test_connection", response = NetworkTestConnectionResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkTestConnectionRequest {
+    /// Optional override. When set, the handler probes this URL instead
+    /// of the configured `networkProxyUrl` preference. The probe always
+    /// appends `/health`, so callers should pass the proxy base URL
+    /// (e.g. `https://proxy.example.com:8080`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_url: Option<String>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkTestConnectionResponse {
+    /// `true` when `/health` returned a 2xx response.
+    pub ok: bool,
+    /// Round-trip latency in milliseconds, populated when `ok == true`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u32>,
+    /// Human-readable error string, populated when `ok == false`. Safe
+    /// to display in the settings pane — never carries provider tokens
+    /// or PII.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+// ── /RUSKY FORK PATCH: _rusky/network/test_connection ────────────────────────
