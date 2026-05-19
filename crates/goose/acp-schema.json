@@ -2545,6 +2545,172 @@
       "x-side": "agent",
       "x-method": "_goose/dictation/model/select"
     },
+    "DistroInfoRequest": {
+      "type": "object",
+      "description": "Returns the loaded distro manifest. Called once at app boot by the\nReact app to populate the distro Zustand store. Session-independent.",
+      "x-side": "agent",
+      "x-method": "_rusky/distro/info"
+    },
+    "DistroInfoResponse": {
+      "type": "object",
+      "properties": {
+        "featureToggles": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "description": "All feature toggles from SPEC-012 §5."
+        },
+        "extensionAllowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ordered list of allowed MCP ids from SPEC-012 §5."
+        },
+        "appVersion": {
+          "type": "string",
+          "description": "SemVer matching Tauri package.version (CI-gated per SPEC-012 AC-10)."
+        },
+        "lockedAt": {
+          "type": "string",
+          "description": "ISO-8601 timestamp when the distro.json was last read (process start time)."
+        }
+      },
+      "required": [
+        "featureToggles",
+        "extensionAllowlist",
+        "appVersion",
+        "lockedAt"
+      ],
+      "x-side": "agent",
+      "x-method": "_rusky/distro/info"
+    },
+    "StorageSizesRequest": {
+      "type": "object",
+      "description": "Per-bucket and total byte counts shown in Settings → Storage.",
+      "x-side": "agent",
+      "x-method": "_rusky/storage/sizes"
+    },
+    "StorageSizesResponse": {
+      "type": "object",
+      "properties": {
+        "cacheBytes": {
+          "type": "integer",
+          "description": "Bytes used by the platform cache dir (Project Rusky). Cleared by\n`_rusky/storage/clear_cache`.",
+          "minimum": 0
+        },
+        "sessionsBytes": {
+          "type": "integer",
+          "description": "Bytes used by the goose sessions directory (sqlite + legacy JSON).",
+          "minimum": 0
+        },
+        "memoryBytes": {
+          "type": "integer",
+          "description": "Bytes used by the on-disk memory store (`memory.sqlite` under data dir).",
+          "minimum": 0
+        },
+        "totalBytes": {
+          "type": "integer",
+          "description": "Sum of the three buckets. Convenience field — clients can render\nthe headline figure without re-summing.",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "cacheBytes",
+        "sessionsBytes",
+        "memoryBytes",
+        "totalBytes"
+      ],
+      "x-side": "agent",
+      "x-method": "_rusky/storage/sizes"
+    },
+    "StorageClearCacheRequest": {
+      "type": "object",
+      "description": "Wipe the platform cache directory (`~/Library/Caches/Project Rusky/*`\non macOS, equivalents on Linux/Windows). Idempotent — clearing an\nalready-empty cache returns `bytes_freed = 0` without erroring.",
+      "x-side": "agent",
+      "x-method": "_rusky/storage/clear_cache"
+    },
+    "StorageClearCacheResponse": {
+      "type": "object",
+      "properties": {
+        "bytesFreed": {
+          "type": "integer",
+          "description": "Total bytes reclaimed by the wipe (best-effort — counted before\nremoval so per-file races still produce a useful figure).",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "bytesFreed"
+      ],
+      "x-side": "agent",
+      "x-method": "_rusky/storage/clear_cache"
+    },
+    "SessionsExportRequest": {
+      "type": "object",
+      "properties": {
+        "targetPath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional absolute path. When provided the handler skips the temp\ndir hop and writes directly to this location."
+        }
+      },
+      "description": "Stream the sessions dir into a tarball. When `target_path` is supplied\nthe tarball is written there directly (the desktop shell drives this\nvia the OS save-file dialog). Otherwise it lands under the platform\ntemp dir and the caller is expected to move it before the OS prunes.",
+      "x-side": "agent",
+      "x-method": "_rusky/sessions/export"
+    },
+    "SessionsExportResponse": {
+      "type": "object",
+      "properties": {
+        "tarballPath": {
+          "type": "string",
+          "description": "Absolute path to the produced `.tar.gz`. Lives under the platform\ntemp dir — caller is expected to copy/move it before the OS prunes\nit."
+        },
+        "bytesWritten": {
+          "type": "integer",
+          "description": "Uncompressed bytes written. Useful for activity-feed messages.",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "tarballPath",
+        "bytesWritten"
+      ],
+      "x-side": "agent",
+      "x-method": "_rusky/sessions/export"
+    },
+    "SessionsImportRequest": {
+      "type": "object",
+      "properties": {
+        "tarballPath": {
+          "type": "string",
+          "description": "Absolute path to the tarball the user picked. Anything readable\nfrom the goose process is fine."
+        }
+      },
+      "required": [
+        "tarballPath"
+      ],
+      "description": "Inflate a user-picked tarball back into the sessions directory.\nSkips any entry whose normalized path would escape the dir (defense\nagainst zip-slip).",
+      "x-side": "agent",
+      "x-method": "_rusky/sessions/import"
+    },
+    "SessionsImportResponse": {
+      "type": "object",
+      "properties": {
+        "importedCount": {
+          "type": "integer",
+          "description": "Count of files successfully extracted into the sessions dir.",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "importedCount"
+      ],
+      "x-side": "agent",
+      "x-method": "_rusky/sessions/import"
+    },
     "ExtRequest": {
       "properties": {
         "id": {
@@ -3051,6 +3217,51 @@
                   ],
                   "description": "Params for _goose/dictation/model/select",
                   "title": "DictationModelSelectRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/DistroInfoRequest"
+                    }
+                  ],
+                  "description": "Params for _rusky/distro/info",
+                  "title": "DistroInfoRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/StorageSizesRequest"
+                    }
+                  ],
+                  "description": "Params for _rusky/storage/sizes",
+                  "title": "StorageSizesRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/StorageClearCacheRequest"
+                    }
+                  ],
+                  "description": "Params for _rusky/storage/clear_cache",
+                  "title": "StorageClearCacheRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/SessionsExportRequest"
+                    }
+                  ],
+                  "description": "Params for _rusky/sessions/export",
+                  "title": "SessionsExportRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/SessionsImportRequest"
+                    }
+                  ],
+                  "description": "Params for _rusky/sessions/import",
+                  "title": "SessionsImportRequest"
                 }
               ]
             },
@@ -3345,6 +3556,46 @@
                         }
                       ],
                       "title": "DictationModelDownloadProgressResponse"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/DistroInfoResponse"
+                        }
+                      ],
+                      "title": "DistroInfoResponse"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/StorageSizesResponse"
+                        }
+                      ],
+                      "title": "StorageSizesResponse"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/StorageClearCacheResponse"
+                        }
+                      ],
+                      "title": "StorageClearCacheResponse"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/SessionsExportResponse"
+                        }
+                      ],
+                      "title": "SessionsExportResponse"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/SessionsImportResponse"
+                        }
+                      ],
+                      "title": "SessionsImportResponse"
                     }
                   ]
                 },

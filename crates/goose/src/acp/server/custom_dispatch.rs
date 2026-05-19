@@ -45,6 +45,14 @@ impl GooseAcpAgent {
         {
             return result;
         }
+        // `_rusky/chat/messages_before` — paginated session history.
+        // Always-on; read-only over the existing session store.
+        if let Some(result) = self
+            .dispatch_rusky_chat_request(method, params.clone())
+            .await
+        {
+            return result;
+        }
         // ── /RUSKY FORK PATCH ──
         self.handle_custom_request(method, params).await
     }
@@ -496,6 +504,40 @@ impl GooseAcpAgent {
         req: DistroInfoRequest,
     ) -> Result<DistroInfoResponse, agent_client_protocol::Error> {
         self.on_distro_info(req).await
+    }
+
+    // _rusky/storage/* + _rusky/sessions/{export,import} — Settings → Storage pane.
+
+    #[custom_method(StorageSizesRequest)]
+    async fn dispatch_rusky_storage_sizes(
+        &self,
+        req: StorageSizesRequest,
+    ) -> Result<StorageSizesResponse, agent_client_protocol::Error> {
+        self.on_storage_sizes(req).await
+    }
+
+    #[custom_method(StorageClearCacheRequest)]
+    async fn dispatch_rusky_storage_clear_cache(
+        &self,
+        req: StorageClearCacheRequest,
+    ) -> Result<StorageClearCacheResponse, agent_client_protocol::Error> {
+        self.on_storage_clear_cache(req).await
+    }
+
+    #[custom_method(SessionsExportRequest)]
+    async fn dispatch_rusky_sessions_export(
+        &self,
+        req: SessionsExportRequest,
+    ) -> Result<SessionsExportResponse, agent_client_protocol::Error> {
+        self.on_sessions_export(req).await
+    }
+
+    #[custom_method(SessionsImportRequest)]
+    async fn dispatch_rusky_sessions_import(
+        &self,
+        req: SessionsImportRequest,
+    ) -> Result<SessionsImportResponse, agent_client_protocol::Error> {
+        self.on_sessions_import(req).await
     }
 
     // ── /RUSKY FORK PATCH ──

@@ -1519,6 +1519,50 @@ pub struct HeartbeatInjectResponse {
 
 // ── /RUSKY FORK PATCH: _rusky/heartbeat/inject ────────────────────────────────
 
+// ── RUSKY FORK PATCH: _rusky/chat/messages_before ────────────────────────────
+//
+// Paginated backward read of a session's persisted message history. Backs
+// the rusky-app chat infinite-scroll-up loader (see
+// `features/chat/api/chatHistory.ts` and
+// `features/chat/hooks/useChatHistoryPagination.ts`).
+//
+// Semantics:
+//   - `before_message_id` is the cursor — the id of the oldest message
+//     currently rendered on the client. The handler returns up to `limit`
+//     messages STRICTLY OLDER than that cursor, in chronological order
+//     (oldest first) so the FE can prepend them directly.
+//   - When `before_message_id` does not exist in the session, the handler
+//     returns an empty page with `has_more: false` (FE treats as "no more
+//     history" — safer than echoing an unknown-id error to the user).
+//   - `limit` defaults to 50, hard-capped at 200 to bound memory.
+
+/// Paginated read of session message history older than a cursor.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/chat/messages_before", response = RuskyChatMessagesBeforeResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct RuskyChatMessagesBeforeRequest {
+    /// Session id whose history to page.
+    pub session_id: String,
+    /// Cursor: id of the oldest currently-rendered message. The response
+    /// contains messages strictly OLDER than this id.
+    pub before_message_id: String,
+    /// Max messages to return. Defaults to 50, capped at 200.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct RuskyChatMessagesBeforeResponse {
+    /// Returned page, ordered chronologically (oldest first). Empty if
+    /// the cursor was unknown or the session has no older messages.
+    pub messages: Vec<serde_json::Value>,
+    /// True iff more messages exist before the returned slice.
+    pub has_more: bool,
+}
+
+// ── /RUSKY FORK PATCH: _rusky/chat/messages_before ────────────────────────────
+
 // ── RUSKY FORK PATCH: _rusky/automations/* (SPEC-061) ────────────────────────
 
 #[cfg(feature = "rusky-automations")]
@@ -1802,3 +1846,98 @@ pub struct BrowserEnsureResponse {
 }
 
 // ── /RUSKY FORK PATCH: _rusky/browser/ensure ─────────────────────────────────
+
+// ── RUSKY FORK PATCH: _rusky/storage/* + _rusky/sessions/{export,import} ─────
+//
+// Settings → Storage pane backing surface. Four methods:
+//
+//   _rusky/storage/sizes        — usage breakdown (cache, sessions, memory)
+//   _rusky/storage/clear_cache  — wipe ~/Library/Caches/Project Rusky/*
+//   _rusky/sessions/export      — pack sessions dir into a tarball, return path
+//   _rusky/sessions/import      — extract a user-picked tarball into the dir
+//
+// All four are local-only: they operate on filesystem state owned by the
+// running goose process. No proxy hop, no auth.
+
+/// Per-bucket and total byte counts shown in Settings → Storage.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/storage/sizes", response = StorageSizesResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageSizesRequest {}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageSizesResponse {
+    /// Bytes used by the platform cache dir (Project Rusky). Cleared by
+    /// `_rusky/storage/clear_cache`.
+    pub cache_bytes: u64,
+    /// Bytes used by the goose sessions directory (sqlite + legacy JSON).
+    pub sessions_bytes: u64,
+    /// Bytes used by the on-disk memory store (`memory.sqlite` under data dir).
+    pub memory_bytes: u64,
+    /// Sum of the three buckets. Convenience field — clients can render
+    /// the headline figure without re-summing.
+    pub total_bytes: u64,
+}
+
+/// Wipe the platform cache directory (`~/Library/Caches/Project Rusky/*`
+/// on macOS, equivalents on Linux/Windows). Idempotent — clearing an
+/// already-empty cache returns `bytes_freed = 0` without erroring.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/storage/clear_cache", response = StorageClearCacheResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageClearCacheRequest {}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageClearCacheResponse {
+    /// Total bytes reclaimed by the wipe (best-effort — counted before
+    /// removal so per-file races still produce a useful figure).
+    pub bytes_freed: u64,
+}
+
+/// Stream the sessions dir into a tarball. When `target_path` is supplied
+/// the tarball is written there directly (the desktop shell drives this
+/// via the OS save-file dialog). Otherwise it lands under the platform
+/// temp dir and the caller is expected to move it before the OS prunes.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/sessions/export", response = SessionsExportResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionsExportRequest {
+    /// Optional absolute path. When provided the handler skips the temp
+    /// dir hop and writes directly to this location.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_path: Option<String>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionsExportResponse {
+    /// Absolute path to the produced `.tar.gz`. Lives under the platform
+    /// temp dir — caller is expected to copy/move it before the OS prunes
+    /// it.
+    pub tarball_path: String,
+    /// Uncompressed bytes written. Useful for activity-feed messages.
+    pub bytes_written: u64,
+}
+
+/// Inflate a user-picked tarball back into the sessions directory.
+/// Skips any entry whose normalized path would escape the dir (defense
+/// against zip-slip).
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/sessions/import", response = SessionsImportResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionsImportRequest {
+    /// Absolute path to the tarball the user picked. Anything readable
+    /// from the goose process is fine.
+    pub tarball_path: String,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionsImportResponse {
+    /// Count of files successfully extracted into the sessions dir.
+    pub imported_count: u32,
+}
+
+// ── /RUSKY FORK PATCH: _rusky/storage/* ──────────────────────────────────────

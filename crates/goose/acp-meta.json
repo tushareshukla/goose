@@ -274,6 +274,31 @@
       "method": "_goose/dictation/model/select",
       "requestType": "DictationModelSelectRequest",
       "responseType": "EmptyResponse"
+    },
+    {
+      "method": "_rusky/distro/info",
+      "requestType": "DistroInfoRequest",
+      "responseType": "DistroInfoResponse"
+    },
+    {
+      "method": "_rusky/storage/sizes",
+      "requestType": "StorageSizesRequest",
+      "responseType": "StorageSizesResponse"
+    },
+    {
+      "method": "_rusky/storage/clear_cache",
+      "requestType": "StorageClearCacheRequest",
+      "responseType": "StorageClearCacheResponse"
+    },
+    {
+      "method": "_rusky/sessions/export",
+      "requestType": "SessionsExportRequest",
+      "responseType": "SessionsExportResponse"
+    },
+    {
+      "method": "_rusky/sessions/import",
+      "requestType": "SessionsImportRequest",
+      "responseType": "SessionsImportResponse"
     }
   ]
 }

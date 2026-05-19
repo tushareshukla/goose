@@ -99,6 +99,13 @@ pub mod rusky_session_end;
 // gate) — the FE adapter in rusky-app degrades gracefully when handlers
 // are absent, but the wedge here is small and dependency-free.
 pub mod rusky_coordinator;
+// _rusky/storage/* + _rusky/sessions/{export,import} — Settings → Storage
+// pane backend (cache wipe, session tarball, disk-usage breakdown).
+pub mod rusky_storage;
+// `_rusky/chat/messages_before` paginated session history. Backs the
+// chat infinite-scroll-up loader in rusky-app. Always compiled — read-only
+// over the existing session store, no external dependencies.
+pub mod rusky_chat;
 // ── /RUSKY FORK PATCH ──
 
 pub type AcpProviderFactory = Arc<

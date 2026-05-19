@@ -170,6 +170,9 @@ tokenizers = { version = "0.21.0", default-features = false, features = ["onig"]
 symphonia = { version = "0.5", features = ["all"], optional = true }
 rubato = { version = "0.16", optional = true }
 zip = { workspace = true }
+# Used by `_rusky/sessions/{export,import}` to pack/unpack the sessions dir.
+tar = "0.4.45"
+flate2 = "1.0"
 sys-info = "0.9"
 
 schemars = { workspace = true, features = [
