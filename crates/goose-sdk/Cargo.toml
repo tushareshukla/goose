@@ -24,6 +24,10 @@ tokio-util = { workspace = true, features = ["compat", "rt"] }
 # Gates the _rusky/memory/* ACP method family types. Enable in Rusky builds;
 # non-Rusky goose builds pay zero binary-size cost without this feature.
 rusky-memory = []
+# Gates the _rusky/automations/* ACP method family types (SPEC-061).
+# Enable in Rusky builds; non-Rusky goose builds pay zero binary-size cost
+# without this feature.
+rusky-automations = []
 # ── /RUSKY FORK PATCH ──
 
 [package.metadata.cargo-machete]

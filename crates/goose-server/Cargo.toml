@@ -41,6 +41,8 @@ native-tls = [
 # Activate the _rusky/memory/* ACP method family in Rusky builds.
 # Non-Rusky goose-server builds leave this off and pay zero binary-size cost.
 rusky-memory = ["goose/rusky-memory"]
+# Activate the _rusky/automations/* ACP method family in Rusky builds (SPEC-061).
+rusky-automations = ["goose/rusky-automations"]
 # ── /RUSKY FORK PATCH ──
 
 [dependencies]

@@ -88,8 +88,10 @@ mod rusky_heartbeat;
 #[cfg(feature = "rusky-memory")]
 mod rusky_memory;
 // SPEC-061: _rusky/automations/* handlers (recipes + schedules + runs).
+// `pub` so the integration test crate can call `dispatch_rusky_automations`
+// directly without spinning up a full agent harness.
 #[cfg(feature = "rusky-automations")]
-mod rusky_automations;
+pub mod rusky_automations;
 // SPEC-051 AC-3: ACP SessionEnd event. Always compiled (no feature gate)
 // because session-lifecycle observability is independent of memory.
 pub mod rusky_session_end;

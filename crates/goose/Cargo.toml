@@ -42,6 +42,10 @@ vulkan = ["local-inference", "llama-cpp-2/vulkan"]
 # Gates _rusky/memory/* ACP method dispatch. Propagates the feature flag from
 # goose-sdk so that goose-server can activate it via goose's feature dependency.
 rusky-memory = ["goose-sdk/rusky-memory"]
+# Gates _rusky/automations/* ACP method dispatch (SPEC-061). Propagates the
+# feature flag from goose-sdk so goose-server can activate it via the
+# feature dependency.
+rusky-automations = ["goose-sdk/rusky-automations"]
 # ── /RUSKY FORK PATCH ──
 rustls-tls = [
     "dep:rustls",
