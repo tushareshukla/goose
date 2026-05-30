@@ -95,8 +95,9 @@ impl GooseAcpAgent {
 pub fn validate_name(raw: &str) -> Result<&str, agent_client_protocol::Error> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
-        return Err(agent_client_protocol::Error::invalid_params()
-            .data("project name must not be empty"));
+        return Err(
+            agent_client_protocol::Error::invalid_params().data("project name must not be empty")
+        );
     }
     if trimmed.len() > NAME_MAX_BYTES {
         return Err(agent_client_protocol::Error::invalid_params()
@@ -118,9 +119,7 @@ pub fn validate_name(raw: &str) -> Result<&str, agent_client_protocol::Error> {
 
 /// Resolve `parent_dir` — caller-supplied or
 /// `~/Documents/Rusky Projects/`. Does NOT create the directory.
-pub fn resolve_parent_dir(
-    explicit: Option<&str>,
-) -> Result<PathBuf, agent_client_protocol::Error> {
+pub fn resolve_parent_dir(explicit: Option<&str>) -> Result<PathBuf, agent_client_protocol::Error> {
     if let Some(p) = explicit.map(str::trim).filter(|s| !s.is_empty()) {
         let path = PathBuf::from(p);
         if !path.is_absolute() {
@@ -261,13 +260,7 @@ mod tests {
 
     #[test]
     fn validate_name_rejects_path_traversal() {
-        for bad in [
-            "../etc/passwd",
-            "..",
-            "foo/bar",
-            "foo\\bar",
-            "evil\0name",
-        ] {
+        for bad in ["../etc/passwd", "..", "foo/bar", "foo\\bar", "evil\0name"] {
             assert!(validate_name(bad).is_err(), "must reject {bad:?}");
         }
     }
@@ -299,7 +292,11 @@ mod tests {
 
     #[test]
     fn resolve_parent_dir_accepts_absolute_override() {
-        let abs = if cfg!(windows) { "C:\\tmp\\rp" } else { "/tmp/rp" };
+        let abs = if cfg!(windows) {
+            "C:\\tmp\\rp"
+        } else {
+            "/tmp/rp"
+        };
         let p = resolve_parent_dir(Some(abs)).unwrap();
         assert_eq!(p, PathBuf::from(abs));
     }

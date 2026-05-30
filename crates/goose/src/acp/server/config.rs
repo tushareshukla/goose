@@ -328,13 +328,9 @@ fn validate_personality_state(
     Ok(())
 }
 
-fn validate_privacy_bool(
-    value: &serde_json::Value,
-) -> Result<(), agent_client_protocol::Error> {
+fn validate_privacy_bool(value: &serde_json::Value) -> Result<(), agent_client_protocol::Error> {
     if !value.is_boolean() {
-        return Err(
-            agent_client_protocol::Error::invalid_params().data("expected a boolean value"),
-        );
+        return Err(agent_client_protocol::Error::invalid_params().data("expected a boolean value"));
     }
     Ok(())
 }
@@ -360,8 +356,9 @@ fn validate_network_proxy_url(
     value: &serde_json::Value,
 ) -> Result<(), agent_client_protocol::Error> {
     let Some(value) = value.as_str() else {
-        return Err(agent_client_protocol::Error::invalid_params()
-            .data("networkProxyUrl must be a string"));
+        return Err(
+            agent_client_protocol::Error::invalid_params().data("networkProxyUrl must be a string")
+        );
     };
     if value.is_empty() {
         // Empty clears the override — explicitly allowed.
@@ -387,13 +384,9 @@ fn validate_network_optional_string(
     Ok(())
 }
 
-fn validate_network_bool(
-    value: &serde_json::Value,
-) -> Result<(), agent_client_protocol::Error> {
+fn validate_network_bool(value: &serde_json::Value) -> Result<(), agent_client_protocol::Error> {
     if !value.is_boolean() {
-        return Err(
-            agent_client_protocol::Error::invalid_params().data("expected a boolean value")
-        );
+        return Err(agent_client_protocol::Error::invalid_params().data("expected a boolean value"));
     }
     Ok(())
 }
@@ -420,9 +413,7 @@ fn validate_network_allowed_domains(
 
 fn validate_g8_bool(value: &serde_json::Value) -> Result<(), agent_client_protocol::Error> {
     if !value.is_boolean() {
-        return Err(
-            agent_client_protocol::Error::invalid_params().data("expected a boolean value"),
-        );
+        return Err(agent_client_protocol::Error::invalid_params().data("expected a boolean value"));
     }
     Ok(())
 }

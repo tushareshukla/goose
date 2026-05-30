@@ -141,7 +141,12 @@ mod tests {
         ];
         for (variant, expected) in cases {
             let json = serde_json::to_string(&variant).unwrap();
-            assert_eq!(json, expected, "variant {} did not serialise correctly", variant.as_str());
+            assert_eq!(
+                json,
+                expected,
+                "variant {} did not serialise correctly",
+                variant.as_str()
+            );
         }
     }
 

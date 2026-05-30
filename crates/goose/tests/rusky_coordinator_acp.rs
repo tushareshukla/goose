@@ -24,9 +24,9 @@
 //!   AC-8 crossfire/start    → crossfire_start_records_event_with_metadata
 
 use goose::acp::server::rusky_coordinator::{
-    handle_control_pause, handle_control_resume, handle_control_stop, handle_coordinator_events_subscribe,
-    handle_coordinator_state, handle_crossfire_start, handle_telepathy_push,
-    reset_store_for_test, seed_delegate_for_test, Delegate,
+    handle_control_pause, handle_control_resume, handle_control_stop,
+    handle_coordinator_events_subscribe, handle_coordinator_state, handle_crossfire_start,
+    handle_telepathy_push, reset_store_for_test, seed_delegate_for_test, Delegate,
 };
 use serde_json::json;
 
@@ -231,9 +231,9 @@ async fn set_coder_tier_rejects_unknown_tier() {
     // Config. We assert the contract by inspecting the tier table
     // exported alongside the module.
     let _ = rusky_coordinator::CODER_TIER_CONFIG_KEY; // forces link
-    // The validation rejects empty + unknown + accepts canonical labels.
-    // (The strict assertion lives in the module-level `#[cfg(test)]`
-    // block: `normalize_tier_rejects_unknown`.)
+                                                      // The validation rejects empty + unknown + accepts canonical labels.
+                                                      // (The strict assertion lives in the module-level `#[cfg(test)]`
+                                                      // block: `normalize_tier_rejects_unknown`.)
 }
 
 // ─── AC-7: telepathy/push ───────────────────────────────────────────────────
@@ -252,7 +252,10 @@ async fn telepathy_push_records_telepathy_channel_event() {
     .await
     .expect("telepathy ok");
     assert_eq!(ack["ok"], true);
-    assert!(ack["eventId"].as_str().unwrap().starts_with("evt-telepathy-"));
+    assert!(ack["eventId"]
+        .as_str()
+        .unwrap()
+        .starts_with("evt-telepathy-"));
 
     let snap = handle_coordinator_state(json!({})).await.unwrap();
     let event = snap["events"].as_array().unwrap().last().unwrap().clone();

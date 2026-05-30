@@ -328,6 +328,10 @@ fn session_meta(session: &Session) -> serde_json::Map<String, serde_json::Value>
             serde_json::Value::String(mc.model_name.clone()),
         );
     }
+    meta.insert(
+        "gooseMode".to_string(),
+        serde_json::Value::String(session.goose_mode.to_string()),
+    );
     meta
 }
 
@@ -1501,6 +1505,36 @@ impl GooseAcpAgent {
                         .add_client("developer".into(), config, client, info, None)
                         .await;
                 }
+
+                // ── RUSKY FORK PATCH: in-app browser agent tools ──
+                // Always register the `browser` extension so the agent
+                // can drive Rusky's in-app browser webview. Unlike the
+                // developer extension it has no client-capability gate:
+                // the browser pane is a core surface and the tools
+                // reach it over the same ACP connection (`cx`).
+                {
+                    let browser_client: Arc<dyn McpClientTrait> =
+                        Arc::new(crate::acp::browser_tools::BrowserClient::new(cx.clone()));
+                    let browser_info = browser_client.get_info().cloned();
+                    let browser_config = ExtensionConfig::Platform {
+                        name: crate::acp::browser_tools::EXTENSION_NAME.into(),
+                        description: "Rusky's in-app web browser.".into(),
+                        display_name: Some("Browser".into()),
+                        bundled: Some(true),
+                        available_tools: Vec::new(),
+                    };
+                    agent
+                        .extension_manager
+                        .add_client(
+                            crate::acp::browser_tools::EXTENSION_NAME.into(),
+                            browser_config,
+                            browser_client,
+                            browser_info,
+                            None,
+                        )
+                        .await;
+                }
+                // ── /RUSKY FORK PATCH ──
 
                 GooseAcpAgent::add_mcp_extensions(&agent, mcp_servers, &setup_session_id)
                     .await

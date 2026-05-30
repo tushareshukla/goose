@@ -436,13 +436,9 @@ pub async fn dispatch_rusky_automations(
             Some(decode_then(params, on_automations_schedule_unregister))
         }
         "_rusky/automations/propose" => Some(decode_then(params, on_automations_propose)),
-        "_rusky/automations/nl_to_recipe" => {
-            Some(decode_then(params, on_automations_nl_to_recipe))
-        }
+        "_rusky/automations/nl_to_recipe" => Some(decode_then(params, on_automations_nl_to_recipe)),
         "_rusky/automations/validate" => Some(decode_then(params, on_automations_validate)),
-        "_rusky/automations/history_list" => {
-            Some(decode_then(params, on_automations_history_list))
-        }
+        "_rusky/automations/history_list" => Some(decode_then(params, on_automations_history_list)),
         _ => None,
     }
 }
@@ -497,7 +493,7 @@ pub fn on_automations_run_now(
 ) -> Result<AutomationsRunNowResponse, agent_client_protocol::Error> {
     if req.recipe_id.trim().is_empty() {
         return Err(
-            agent_client_protocol::Error::invalid_params().data("recipe_id must not be empty"),
+            agent_client_protocol::Error::invalid_params().data("recipe_id must not be empty")
         );
     }
     let run_id = format!("run_{}", uuid::Uuid::now_v7());
@@ -528,9 +524,7 @@ pub fn on_automations_stop(
     req: AutomationsStopRequest,
 ) -> Result<AutomationsStopResponse, agent_client_protocol::Error> {
     if req.run_id.trim().is_empty() {
-        return Err(
-            agent_client_protocol::Error::invalid_params().data("run_id must not be empty"),
-        );
+        return Err(agent_client_protocol::Error::invalid_params().data("run_id must not be empty"));
     }
     let removed = with_registry(|reg| {
         let before = reg.rows.len();
@@ -565,7 +559,7 @@ pub fn on_automations_schedule_register(
 ) -> Result<AutomationsScheduleRegisterResponse, agent_client_protocol::Error> {
     if req.recipe_id.trim().is_empty() {
         return Err(
-            agent_client_protocol::Error::invalid_params().data("recipe_id must not be empty"),
+            agent_client_protocol::Error::invalid_params().data("recipe_id must not be empty")
         );
     }
     if let Err(e) = validate_cron(&req.cron) {
@@ -642,8 +636,7 @@ pub fn on_automations_propose(
     let target = recipes_dir.join(format!("{recipe_id}.yaml"));
     let tmp = target.with_extension("yaml.tmp");
     std::fs::write(&tmp, req.yaml.as_bytes()).map_err(|e| {
-        agent_client_protocol::Error::internal_error()
-            .data(format!("recipe write failed: {e}"))
+        agent_client_protocol::Error::internal_error().data(format!("recipe write failed: {e}"))
     })?;
     #[cfg(unix)]
     {
@@ -652,8 +645,7 @@ pub fn on_automations_propose(
         let _ = std::fs::set_permissions(&tmp, perms);
     }
     std::fs::rename(&tmp, &target).map_err(|e| {
-        agent_client_protocol::Error::internal_error()
-            .data(format!("recipe rename failed: {e}"))
+        agent_client_protocol::Error::internal_error().data(format!("recipe rename failed: {e}"))
     })?;
     if let Some(cron) = req.cron {
         let mut state = load_scheduler_state().unwrap_or_default();
@@ -774,14 +766,12 @@ where
     let req: Req = if params.is_null() {
         Req::default()
     } else {
-        serde_json::from_value::<Req>(params).map_err(|e| {
-            agent_client_protocol::Error::invalid_params().data(e.to_string())
-        })?
+        serde_json::from_value::<Req>(params)
+            .map_err(|e| agent_client_protocol::Error::invalid_params().data(e.to_string()))?
     };
     let resp = f(req)?;
-    serde_json::to_value(&resp).map_err(|e| {
-        agent_client_protocol::Error::internal_error().data(e.to_string())
-    })
+    serde_json::to_value(&resp)
+        .map_err(|e| agent_client_protocol::Error::internal_error().data(e.to_string()))
 }
 
 // ── /RUSKY FORK PATCH: _rusky/automations/* ──────────────────────────────────

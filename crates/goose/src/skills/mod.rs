@@ -532,7 +532,11 @@ mod tests {
                 source.name,
                 source.path
             );
-            assert!(source.global, "BuiltinSkill '{}' must be global", source.name);
+            assert!(
+                source.global,
+                "BuiltinSkill '{}' must be global",
+                source.name
+            );
         }
     }
 
@@ -542,7 +546,10 @@ mod tests {
         // matters so users can override a bundle they don't like.
         let tmp = TempDir::new().unwrap();
         let project_root = tmp.path();
-        let skills_dir = project_root.join(".agents").join("skills").join("meeting-notes");
+        let skills_dir = project_root
+            .join(".agents")
+            .join("skills")
+            .join("meeting-notes");
         std::fs::create_dir_all(&skills_dir).unwrap();
         std::fs::write(
             skills_dir.join("SKILL.md"),

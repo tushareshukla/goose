@@ -51,8 +51,14 @@ fn collision_appends_numeric_suffix() {
     let (_id2, root2) = create_project_at(&parent, name).expect("second ok");
     let (_id3, root3) = create_project_at(&parent, name).expect("third ok");
 
-    assert_ne!(root1, root2, "second project must land in a different folder");
-    assert_ne!(root2, root3, "third project must land in a different folder");
+    assert_ne!(
+        root1, root2,
+        "second project must land in a different folder"
+    );
+    assert_ne!(
+        root2, root3,
+        "third project must land in a different folder"
+    );
 
     // The first project owns the canonical slug; subsequent ones get
     // `-2`, `-3`, … suffixes.
@@ -85,8 +91,14 @@ fn non_ascii_name_falls_back_to_project_slug() {
 
     assert_eq!(slugify(n1), "project");
     assert_eq!(slugify(n2), "project");
-    assert_eq!(root1.file_name().and_then(std::ffi::OsStr::to_str), Some("project"));
-    assert_eq!(root2.file_name().and_then(std::ffi::OsStr::to_str), Some("project-2"));
+    assert_eq!(
+        root1.file_name().and_then(std::ffi::OsStr::to_str),
+        Some("project")
+    );
+    assert_eq!(
+        root2.file_name().and_then(std::ffi::OsStr::to_str),
+        Some("project-2")
+    );
 }
 
 #[test]
@@ -109,12 +121,10 @@ fn resolve_parent_accepts_absolute_and_rejects_relative() {
     } else {
         PathBuf::from("/tmp/rusky-test")
     };
-    let resolved =
-        resolve_parent_dir(Some(abs.to_str().unwrap())).expect("absolute is accepted");
+    let resolved = resolve_parent_dir(Some(abs.to_str().unwrap())).expect("absolute is accepted");
     assert_eq!(resolved, abs);
 
-    let err = resolve_parent_dir(Some("relative/path"))
-        .expect_err("relative path is rejected");
+    let err = resolve_parent_dir(Some("relative/path")).expect_err("relative path is rejected");
     let v = serde_json::to_value(&err).expect("err serializes");
     assert_eq!(
         v.get("code").and_then(|c| c.as_i64()),

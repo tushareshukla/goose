@@ -52,9 +52,8 @@ impl GooseAcpAgent {
             }
         };
         Some(self.on_chat_messages_before(req).await.and_then(|r| {
-            serde_json::to_value(&r).map_err(|e| {
-                agent_client_protocol::Error::internal_error().data(e.to_string())
-            })
+            serde_json::to_value(&r)
+                .map_err(|e| agent_client_protocol::Error::internal_error().data(e.to_string()))
         }))
     }
 
@@ -75,8 +74,9 @@ pub async fn chat_messages_before(
     req: RuskyChatMessagesBeforeRequest,
 ) -> Result<RuskyChatMessagesBeforeResponse, agent_client_protocol::Error> {
     if req.session_id.trim().is_empty() {
-        return Err(agent_client_protocol::Error::invalid_params()
-            .data("sessionId must not be empty"));
+        return Err(
+            agent_client_protocol::Error::invalid_params().data("sessionId must not be empty")
+        );
     }
     if req.before_message_id.trim().is_empty() {
         return Err(agent_client_protocol::Error::invalid_params()
@@ -93,8 +93,7 @@ pub async fn chat_messages_before(
         .get_session(&req.session_id, /* include_messages */ true)
         .await
         .map_err(|e| {
-            agent_client_protocol::Error::internal_error()
-                .data(format!("session read failed: {e}"))
+            agent_client_protocol::Error::internal_error().data(format!("session read failed: {e}"))
         })?;
 
     let conversation = match session.conversation {
@@ -148,8 +147,7 @@ pub async fn chat_messages_before(
     let mut out: Vec<serde_json::Value> = Vec::with_capacity(slice.len());
     for m in slice {
         let v = serde_json::to_value(m).map_err(|e| {
-            agent_client_protocol::Error::internal_error()
-                .data(format!("serialize message: {e}"))
+            agent_client_protocol::Error::internal_error().data(format!("serialize message: {e}"))
         })?;
         out.push(v);
     }

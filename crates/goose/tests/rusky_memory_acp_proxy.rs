@@ -84,7 +84,11 @@ async fn post_json(route: &str, body: serde_json::Value) -> reqwest::Response {
         .timeout(std::time::Duration::from_secs(5))
         .build()
         .unwrap()
-        .post(format!("{}/v1/memory/{}", proxy_url.trim_end_matches('/'), route))
+        .post(format!(
+            "{}/v1/memory/{}",
+            proxy_url.trim_end_matches('/'),
+            route
+        ))
         .header("X-Rusky-Local-Agent", token)
         .json(&body)
         .send()
@@ -99,7 +103,11 @@ async fn get_json(route: &str) -> reqwest::Response {
         .timeout(std::time::Duration::from_secs(5))
         .build()
         .unwrap()
-        .get(format!("{}/v1/memory/{}", proxy_url.trim_end_matches('/'), route))
+        .get(format!(
+            "{}/v1/memory/{}",
+            proxy_url.trim_end_matches('/'),
+            route
+        ))
         .header("X-Rusky-Local-Agent", token)
         .send()
         .await
@@ -172,11 +180,7 @@ async fn acp_memory_search_calls_proxy_v1_search() {
         .await;
     let _g = EnvGuard::new(Some(LOCAL_TOKEN), Some(&mock.uri()));
 
-    let resp = post_json(
-        "search",
-        json!({ "query": "rust language", "top_k": 5 }),
-    )
-    .await;
+    let resp = post_json("search", json!({ "query": "rust language", "top_k": 5 })).await;
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(body["hits"].as_array().unwrap().len(), 1);
@@ -268,5 +272,8 @@ async fn acp_memory_status_handles_proxy_network_failure() {
         .get("http://127.0.0.1:1/v1/memory/status")
         .send()
         .await;
-    assert!(res.is_err(), "unreachable proxy must surface as network err");
+    assert!(
+        res.is_err(),
+        "unreachable proxy must surface as network err"
+    );
 }

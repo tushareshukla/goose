@@ -1,4 +1,5 @@
 mod adapters;
+pub(crate) mod browser_tools;
 mod common;
 pub(crate) mod fs;
 mod mcp_app_proxy;

@@ -65,9 +65,8 @@ impl GooseAcpAgent {
             }
         };
         Some(self.on_heartbeat_inject(req).await.and_then(|r| {
-            serde_json::to_value(&r).map_err(|e| {
-                agent_client_protocol::Error::internal_error().data(e.to_string())
-            })
+            serde_json::to_value(&r)
+                .map_err(|e| agent_client_protocol::Error::internal_error().data(e.to_string()))
         }))
     }
 
@@ -83,16 +82,19 @@ impl GooseAcpAgent {
         // client supplied something else we surface invalid_params so
         // the driver upstream can record `heartbeat.config_invalid`.
         if req.role != "system" {
-            return Err(agent_client_protocol::Error::invalid_params()
-                .data(format!("heartbeat role must be \"system\", got {:?}", req.role)));
+            return Err(agent_client_protocol::Error::invalid_params().data(format!(
+                "heartbeat role must be \"system\", got {:?}",
+                req.role
+            )));
         }
         if req.content.is_empty() {
             return Err(agent_client_protocol::Error::invalid_params()
                 .data("heartbeat content must not be empty"));
         }
         if req.content.len() > MAX_CONTENT_BYTES {
-            return Err(agent_client_protocol::Error::invalid_params()
-                .data(format!("heartbeat content exceeds {MAX_CONTENT_BYTES} bytes")));
+            return Err(agent_client_protocol::Error::invalid_params().data(format!(
+                "heartbeat content exceeds {MAX_CONTENT_BYTES} bytes"
+            )));
         }
 
         // SPEC-090 §Error matrix: heartbeat_session_unknown.
@@ -104,8 +106,9 @@ impl GooseAcpAgent {
                 outcome = "session_unknown",
                 "heartbeat injection rejected: session not found",
             );
-            return Err(agent_client_protocol::Error::invalid_params()
-                .data("heartbeat_session_unknown"));
+            return Err(
+                agent_client_protocol::Error::invalid_params().data("heartbeat_session_unknown")
+            );
         }
 
         // Build the message: User role + agent_only metadata. The
@@ -164,7 +167,6 @@ impl GooseAcpAgent {
             inference_started: true,
         })
     }
-
 }
 
 // ── /RUSKY FORK PATCH: _rusky/heartbeat/inject ────────────────────────────────

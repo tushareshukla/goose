@@ -14,9 +14,7 @@
 
 use super::GooseAcpAgent;
 use crate::config::Config;
-use goose_sdk::custom_requests::{
-    NetworkTestConnectionRequest, NetworkTestConnectionResponse,
-};
+use goose_sdk::custom_requests::{NetworkTestConnectionRequest, NetworkTestConnectionResponse};
 use std::time::{Duration, Instant};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -104,7 +102,9 @@ impl GooseAcpAgent {
         if let Some(raw) = override_url.map(str::trim).filter(|s| !s.is_empty()) {
             return validate_url(raw);
         }
-        let config = self.config().map_err(|e| format!("config unavailable: {e:?}"))?;
+        let config = self
+            .config()
+            .map_err(|e| format!("config unavailable: {e:?}"))?;
         if let Some(stored) = optional_config_string(&config, CONFIG_KEY_PROXY_URL) {
             if !stored.trim().is_empty() {
                 return validate_url(stored.trim());

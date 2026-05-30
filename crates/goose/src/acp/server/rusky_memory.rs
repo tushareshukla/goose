@@ -37,7 +37,9 @@ fn proxy_url() -> String {
 }
 
 fn local_token() -> Option<String> {
-    std::env::var(LOCAL_AGENT_ENV).ok().filter(|s| !s.is_empty())
+    std::env::var(LOCAL_AGENT_ENV)
+        .ok()
+        .filter(|s| !s.is_empty())
 }
 
 /// Build the reqwest client used for ACP→proxy memory calls.
@@ -87,8 +89,7 @@ async fn post_json<Req: serde::Serialize, Resp: serde::de::DeserializeOwned>(
                 error = %e,
                 "memory proxy unreachable",
             );
-            agent_client_protocol::Error::internal_error()
-                .data(format!("proxy unreachable: {e}"))
+            agent_client_protocol::Error::internal_error().data(format!("proxy unreachable: {e}"))
         })?;
 
     let status = resp.status();
@@ -128,8 +129,7 @@ async fn get_json<Resp: serde::de::DeserializeOwned>(
         .send()
         .await
         .map_err(|e| {
-            agent_client_protocol::Error::internal_error()
-                .data(format!("proxy unreachable: {e}"))
+            agent_client_protocol::Error::internal_error().data(format!("proxy unreachable: {e}"))
         })?;
     if !resp.status().is_success() {
         return Err(agent_client_protocol::Error::internal_error()
@@ -379,8 +379,9 @@ impl GooseAcpAgent {
     ) -> Result<MemorySearchResponse, agent_client_protocol::Error> {
         // See on_memory_flush comment re: Send constraint.
         if req.query.trim().is_empty() {
-            return Err(agent_client_protocol::Error::invalid_params()
-                .data("query must not be empty"));
+            return Err(
+                agent_client_protocol::Error::invalid_params().data("query must not be empty")
+            );
         }
         let body = SearchBody {
             query: &req.query,

@@ -502,9 +502,7 @@ mod tests {
     async fn empty_manager_dispatch_is_noop() {
         let mgr = SyncHookManager::new();
         let ctx = SyncHookContext::default();
-        let result = mgr
-            .dispatch(SyncHookEvent::PreLLMRequest, &ctx)
-            .await;
+        let result = mgr.dispatch(SyncHookEvent::PreLLMRequest, &ctx).await;
         assert!(result.mutations.is_empty());
         assert!(!result.is_aborted());
         assert!(mgr.is_empty().await);
@@ -555,8 +553,10 @@ mod tests {
     async fn slow_hook_times_out_chain_continues() {
         let mgr = SyncHookManager::new();
         mgr.register(Arc::new(SlowHook)).await;
-        mgr.register(Arc::new(InjectHook { msg: "after timeout" }))
-            .await;
+        mgr.register(Arc::new(InjectHook {
+            msg: "after timeout",
+        }))
+        .await;
         let start = std::time::Instant::now();
         let result = mgr
             .dispatch(SyncHookEvent::PreLLMRequest, &SyncHookContext::default())

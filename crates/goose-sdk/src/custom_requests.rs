@@ -2077,3 +2077,250 @@ pub struct CreateProjectResponse {
 }
 
 // ── /RUSKY FORK PATCH: _rusky/projects/create ────────────────────────────────
+
+// ── RUSKY FORK PATCH: _rusky/browser/* ───────────────────────────────────────
+//
+// Agent → client (renderer) requests that drive Rusky's in-app native
+// browser webview. These are the wire types behind the `browser_*`
+// agent tools registered by `crates/goose/src/acp/browser_tools.rs`.
+//
+// Direction is the reverse of every other request in this file: the
+// goose agent issues these via `cx.send_request(...)` to the ACP
+// client. The renderer answers them in its `extMethod` callback
+// (`rusky-app/src/shared/api/acpConnection.ts`), which dispatches each
+// `_rusky/browser/*` method onto `window.__ruskyBrowser` — the
+// renderer-side control surface for the Tauri child webview.
+//
+// Because they are agent-initiated, these requests are NOT registered
+// in `custom_dispatch.rs` (that file is the client → agent direction)
+// and do NOT appear as methods on the generated `GooseClient`. They are
+// defined here purely so the goose crate has typed `JsonRpcRequest`
+// structs to hand to `cx.send_request`.
+
+/// Open a NEW browser tab at a URL. Each tab is its own native webview
+/// with its own page + history; call this repeatedly to open several.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/open_tab", response = BrowserOpenTabResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserOpenTabRequest {
+    /// Fully-qualified URL to load in the new tab (e.g. `https://apple.com`).
+    pub url: String,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserOpenTabResponse {
+    /// Stable id of the newly-created tab. Pass it to other browser
+    /// tools to target this specific tab.
+    pub tab_id: String,
+    /// The URL the new tab committed to after navigation settled.
+    #[serde(default)]
+    pub url: String,
+    /// `document.title` of the loaded page, best-effort.
+    #[serde(default)]
+    pub title: String,
+}
+
+/// List every open browser tab.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/list_tabs", response = BrowserListTabsResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserListTabsRequest {}
+
+/// One entry in the `_rusky/browser/list_tabs` result.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserTabInfo {
+    /// Stable tab id.
+    pub tab_id: String,
+    /// 1-based position of the tab in the strip (left → right).
+    #[serde(default)]
+    pub index: u32,
+    /// Current page URL.
+    #[serde(default)]
+    pub url: String,
+    /// Current page title.
+    #[serde(default)]
+    pub title: String,
+    /// Whether this is the active (foreground) tab.
+    #[serde(default)]
+    pub active: bool,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserListTabsResponse {
+    /// Every open browser tab, in tab-strip order.
+    #[serde(default)]
+    pub tabs: Vec<BrowserTabInfo>,
+}
+
+/// Switch the active (foreground) browser tab.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/switch_tab", response = BrowserSwitchTabResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserSwitchTabRequest {
+    /// Id of the tab to bring to the foreground.
+    pub tab_id: String,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserSwitchTabResponse {
+    /// Id of the tab now active.
+    pub tab_id: String,
+    /// Current URL of that tab.
+    #[serde(default)]
+    pub url: String,
+    /// Current title of that tab.
+    #[serde(default)]
+    pub title: String,
+}
+
+/// Close a browser tab.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/close_tab", response = BrowserCloseTabResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserCloseTabRequest {
+    /// Id of the tab to close.
+    pub tab_id: String,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserCloseTabResponse {
+    /// Id of the tab that was targeted.
+    pub tab_id: String,
+    /// Whether a tab was actually closed (`false` if it was already gone).
+    #[serde(default)]
+    pub closed: bool,
+}
+
+/// Navigate a browser tab to a URL. Opens the browser pane first if it
+/// is not visible. Targets the active tab when `tab_id` is omitted.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/navigate", response = BrowserNavigateResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserNavigateRequest {
+    /// Fully-qualified URL to load (e.g. `https://apple.com`).
+    pub url: String,
+    /// Optional tab id. When omitted the active tab is navigated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tab_id: Option<String>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserNavigateResponse {
+    /// The URL the browser committed to after navigation settled.
+    pub url: String,
+    /// `document.title` of the loaded page, best-effort.
+    #[serde(default)]
+    pub title: String,
+    /// Id of the tab that was navigated.
+    #[serde(default)]
+    pub tab_id: String,
+}
+
+/// Read the visible text of a page, or of a specific element. Targets
+/// the active tab when `tab_id` is omitted.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/read", response = BrowserReadResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserReadRequest {
+    /// Optional CSS selector. When omitted the whole `<body>` is read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector: Option<String>,
+    /// Optional tab id. When omitted the active tab is read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tab_id: Option<String>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserReadResponse {
+    /// Current page URL.
+    #[serde(default)]
+    pub url: String,
+    /// `document.title` of the page.
+    #[serde(default)]
+    pub title: String,
+    /// Visible text content (`innerText`) of the page or selected node.
+    pub text: String,
+}
+
+/// Click the first element matching a CSS selector. Targets the active
+/// tab when `tab_id` is omitted.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/click", response = BrowserClickResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserClickRequest {
+    /// CSS selector of the element to click.
+    pub selector: String,
+    /// Optional tab id. When omitted the active tab is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tab_id: Option<String>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserClickResponse {
+    /// Human-readable outcome (e.g. `"clicked"`).
+    pub result: String,
+    /// Page URL after the click (may have changed if the click navigated).
+    #[serde(default)]
+    pub url: String,
+}
+
+/// Capture a screenshot of the in-app browser viewport.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/screenshot", response = BrowserScreenshotResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserScreenshotRequest {}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserScreenshotResponse {
+    /// Absolute path to the saved PNG on disk.
+    pub path: String,
+}
+
+/// Read the browser's current URL and title without navigating.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/current_url", response = BrowserCurrentUrlResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserCurrentUrlRequest {}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserCurrentUrlResponse {
+    /// Current page URL. Empty when the browser pane is not yet open.
+    #[serde(default)]
+    pub url: String,
+    /// `document.title` of the current page.
+    #[serde(default)]
+    pub title: String,
+    /// Whether the browser pane currently exists / is open.
+    #[serde(default)]
+    pub open: bool,
+}
+
+/// Close (hide) the whole in-app browser panel — the right-hand
+/// workspace pane. This collapses the panel from view; it does not
+/// destroy individual tabs' history. Calling `browser_navigate` or
+/// `browser_open_tab` afterwards re-opens the panel.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(method = "_rusky/browser/close_pane", response = BrowserClosePaneResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserClosePaneRequest {}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserClosePaneResponse {
+    /// Whether the panel was open and is now closed (`false` if it was
+    /// already closed — the call is idempotent either way).
+    #[serde(default)]
+    pub closed: bool,
+}
+
+// ── /RUSKY FORK PATCH: _rusky/browser/* ──────────────────────────────────────

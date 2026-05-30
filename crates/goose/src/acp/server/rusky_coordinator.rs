@@ -350,8 +350,8 @@ pub async fn handle_coordinator_events_subscribe(
 pub async fn handle_control_pause(
     params: serde_json::Value,
 ) -> Result<serde_json::Value, agent_client_protocol::Error> {
-    let req: ControlRequest = serde_json::from_value(params)
-        .map_err(|e| invalid(format!("bad control body: {e}")))?;
+    let req: ControlRequest =
+        serde_json::from_value(params).map_err(|e| invalid(format!("bad control body: {e}")))?;
     let target = control_target(&req)?;
     let mut s = store().lock().await;
     s.set_delegate_status(target.as_deref(), "paused");
@@ -385,8 +385,8 @@ pub async fn handle_control_pause(
 pub async fn handle_control_resume(
     params: serde_json::Value,
 ) -> Result<serde_json::Value, agent_client_protocol::Error> {
-    let req: ControlRequest = serde_json::from_value(params)
-        .map_err(|e| invalid(format!("bad control body: {e}")))?;
+    let req: ControlRequest =
+        serde_json::from_value(params).map_err(|e| invalid(format!("bad control body: {e}")))?;
     let target = control_target(&req)?;
     let mut s = store().lock().await;
     s.set_delegate_status(target.as_deref(), "running");
@@ -426,8 +426,8 @@ pub async fn handle_control_resume(
 pub async fn handle_control_stop(
     params: serde_json::Value,
 ) -> Result<serde_json::Value, agent_client_protocol::Error> {
-    let req: ControlRequest = serde_json::from_value(params)
-        .map_err(|e| invalid(format!("bad control body: {e}")))?;
+    let req: ControlRequest =
+        serde_json::from_value(params).map_err(|e| invalid(format!("bad control body: {e}")))?;
     let target = control_target(&req)?;
     let mut s = store().lock().await;
     s.set_delegate_status(target.as_deref(), "done");
@@ -466,8 +466,8 @@ pub async fn handle_control_stop(
 pub async fn handle_telepathy_push(
     params: serde_json::Value,
 ) -> Result<serde_json::Value, agent_client_protocol::Error> {
-    let req: TelepathyPushRequest = serde_json::from_value(params)
-        .map_err(|e| invalid(format!("bad telepathy body: {e}")))?;
+    let req: TelepathyPushRequest =
+        serde_json::from_value(params).map_err(|e| invalid(format!("bad telepathy body: {e}")))?;
     if req.delegate_id.trim().is_empty() {
         return Err(invalid("delegateId must not be empty"));
     }
@@ -479,7 +479,10 @@ pub async fn handle_telepathy_push(
     let id = s.next_event_id("telepathy");
     let event = TimelineEvent {
         id: id.clone(),
-        delegate_id: req.from.clone().unwrap_or_else(|| "orchestrator".to_string()),
+        delegate_id: req
+            .from
+            .clone()
+            .unwrap_or_else(|| "orchestrator".to_string()),
         summary: req.message.clone(),
         timestamp: current_epoch_millis(),
         channel: "telepathy".to_string(),
@@ -502,8 +505,8 @@ pub async fn handle_telepathy_push(
 pub async fn handle_crossfire_start(
     params: serde_json::Value,
 ) -> Result<serde_json::Value, agent_client_protocol::Error> {
-    let req: CrossfireStartRequest = serde_json::from_value(params)
-        .map_err(|e| invalid(format!("bad crossfire body: {e}")))?;
+    let req: CrossfireStartRequest =
+        serde_json::from_value(params).map_err(|e| invalid(format!("bad crossfire body: {e}")))?;
     if req.reviewer_ids.len() < 2 {
         return Err(invalid(
             "crossfire requires at least 2 reviewer ids (different models)",

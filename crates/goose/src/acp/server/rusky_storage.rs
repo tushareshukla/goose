@@ -28,9 +28,8 @@ use tar::{Archive, Builder};
 
 use super::GooseAcpAgent;
 use crate::acp::custom_requests::{
-    SessionsExportRequest, SessionsExportResponse, SessionsImportRequest,
-    SessionsImportResponse, StorageClearCacheRequest, StorageClearCacheResponse,
-    StorageSizesRequest, StorageSizesResponse,
+    SessionsExportRequest, SessionsExportResponse, SessionsImportRequest, SessionsImportResponse,
+    StorageClearCacheRequest, StorageClearCacheResponse, StorageSizesRequest, StorageSizesResponse,
 };
 use crate::config::paths::Paths;
 
@@ -119,9 +118,7 @@ impl GooseAcpAgent {
         &self,
         _req: StorageSizesRequest,
     ) -> Result<StorageSizesResponse, agent_client_protocol::Error> {
-        let cache_bytes = rusky_cache_dir()
-            .map(|p| dir_size_bytes(&p))
-            .unwrap_or(0);
+        let cache_bytes = rusky_cache_dir().map(|p| dir_size_bytes(&p)).unwrap_or(0);
         let sessions_bytes = dir_size_bytes(&sessions_dir());
         let memory_bytes = dir_size_bytes(&memory_dir());
         let total_bytes = cache_bytes
@@ -153,8 +150,7 @@ impl GooseAcpAgent {
             return Ok(StorageClearCacheResponse { bytes_freed: 0 });
         };
         let freed = wipe_dir_contents(&cache).map_err(|e| {
-            agent_client_protocol::Error::internal_error()
-                .data(format!("clear cache failed: {e}"))
+            agent_client_protocol::Error::internal_error().data(format!("clear cache failed: {e}"))
         })?;
         tracing::info!(
             target: "goose::acp::rusky_storage",
@@ -191,8 +187,7 @@ impl GooseAcpAgent {
             // Produce an empty tarball so the desktop save-file dialog
             // still has something concrete to hand the user.
             let file = fs::File::create(&out_path).map_err(|e| {
-                agent_client_protocol::Error::internal_error()
-                    .data(format!("create tarball: {e}"))
+                agent_client_protocol::Error::internal_error().data(format!("create tarball: {e}"))
             })?;
             let enc = GzEncoder::new(file, Compression::default());
             let mut builder = Builder::new(enc);
@@ -209,20 +204,15 @@ impl GooseAcpAgent {
         let bytes_written = dir_size_bytes(&src);
 
         let file = fs::File::create(&out_path).map_err(|e| {
-            agent_client_protocol::Error::internal_error()
-                .data(format!("create tarball: {e}"))
+            agent_client_protocol::Error::internal_error().data(format!("create tarball: {e}"))
         })?;
         let enc = GzEncoder::new(file, Compression::default());
         let mut builder = Builder::new(enc);
-        builder
-            .append_dir_all(SESSIONS_FOLDER, &src)
-            .map_err(|e| {
-                agent_client_protocol::Error::internal_error()
-                    .data(format!("pack tarball: {e}"))
-            })?;
+        builder.append_dir_all(SESSIONS_FOLDER, &src).map_err(|e| {
+            agent_client_protocol::Error::internal_error().data(format!("pack tarball: {e}"))
+        })?;
         builder.finish().map_err(|e| {
-            agent_client_protocol::Error::internal_error()
-                .data(format!("finalise tarball: {e}"))
+            agent_client_protocol::Error::internal_error().data(format!("finalise tarball: {e}"))
         })?;
 
         tracing::info!(
@@ -255,8 +245,7 @@ impl GooseAcpAgent {
         })?;
 
         let file = fs::File::open(&src).map_err(|e| {
-            agent_client_protocol::Error::invalid_params()
-                .data(format!("open tarball: {e}"))
+            agent_client_protocol::Error::invalid_params().data(format!("open tarball: {e}"))
         })?;
         let dec = GzDecoder::new(file);
         let mut archive = Archive::new(dec);
@@ -268,12 +257,10 @@ impl GooseAcpAgent {
         let mut imported: u32 = 0;
         for entry in entries {
             let mut entry = entry.map_err(|e| {
-                agent_client_protocol::Error::invalid_params()
-                    .data(format!("read entry: {e}"))
+                agent_client_protocol::Error::invalid_params().data(format!("read entry: {e}"))
             })?;
             let raw_path = entry.path().map_err(|e| {
-                agent_client_protocol::Error::invalid_params()
-                    .data(format!("entry path: {e}"))
+                agent_client_protocol::Error::invalid_params().data(format!("entry path: {e}"))
             })?;
             // Strip the leading `sessions/` we wrote on export, so the
             // entries land directly under the dest sessions dir.
@@ -284,7 +271,10 @@ impl GooseAcpAgent {
 
             // Reject any entry whose normalized path tries to escape the
             // sessions dir (zip-slip defense).
-            if rel.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+            if rel
+                .components()
+                .any(|c| matches!(c, std::path::Component::ParentDir))
+            {
                 tracing::warn!(
                     target: "goose::acp::rusky_storage",
                     event = "rusky_sessions_import_skipped",
@@ -314,8 +304,7 @@ impl GooseAcpAgent {
                 let _ = fs::create_dir_all(parent);
             }
             entry.unpack(&out_path).map_err(|e| {
-                agent_client_protocol::Error::internal_error()
-                    .data(format!("unpack entry: {e}"))
+                agent_client_protocol::Error::internal_error().data(format!("unpack entry: {e}"))
             })?;
             imported = imported.saturating_add(1);
         }
@@ -365,10 +354,7 @@ pub fn clear_cache_under(cache_dir: &Path) -> std::io::Result<u64> {
 }
 
 /// Pack `sessions_dir` into `out_tarball` and return bytes packed.
-pub fn export_sessions_under(
-    sessions_dir: &Path,
-    out_tarball: &Path,
-) -> std::io::Result<u64> {
+pub fn export_sessions_under(sessions_dir: &Path, out_tarball: &Path) -> std::io::Result<u64> {
     let bytes_written = dir_size_bytes(sessions_dir);
     let file = fs::File::create(out_tarball)?;
     let enc = GzEncoder::new(file, Compression::default());
